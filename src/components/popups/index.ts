@@ -195,6 +195,7 @@ export default class PopupElement<T extends EventListenerListeners = {}> extends
 
     this.container.append(this.header);
     if(options.body) {
+      console.log(123);
       this.body = document.createElement('div');
       this.body.classList.add('popup-body');
       this.container.append(this.body);
@@ -423,7 +424,7 @@ export default class PopupElement<T extends EventListenerListeners = {}> extends
     }, 250);
   }
 
-  protected appendSolid(callback: () => JSX.Element) {
+  public appendSolid(callback: () => JSX.Element) {
     const div = document.createElement('div');
     (this.scrollable || this.body).append(div);
     const dispose = render(callback, div);

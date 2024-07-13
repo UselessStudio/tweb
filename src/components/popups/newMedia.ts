@@ -54,6 +54,12 @@ import {ChatType} from '../chat/chat';
 import pause from '../../helpers/schedulers/pause';
 import {Accessor, createRoot, createSignal, Setter} from 'solid-js';
 import SelectedEffect from '../chat/selectedEffect';
+import {ButtonOptions} from '../button';
+import {IS_MOBILE} from '../../environment/userAgent';
+import ripple from '../ripple';
+import Icon from '../icon';
+import {ButtonMenuItemOptions, ButtonMenuItemOptionsVerifiable} from '../buttonMenu';
+import {openMediaEditor} from '../mediaEditor';
 
 type SendFileParams = SendFileDetails & {
   file?: File,
@@ -61,7 +67,8 @@ type SendFileParams = SendFileDetails & {
   noSound?: boolean,
   itemDiv: HTMLElement,
   mediaSpoiler?: HTMLElement,
-  middlewareHelper: MiddlewareHelper
+  middlewareHelper: MiddlewareHelper,
+  photoButtons?: PhotoButtons
   // strippedBytes?: PhotoSize.photoStrippedSize['bytes']
 };
 
@@ -71,6 +78,159 @@ const MAX_WIDTH = 400 - 16;
 
 export function getCurrentNewMediaPopup() {
   return currentPopup;
+}
+
+class PhotoButtons {
+  private applyMediaSpoiler: (...args: any[]) => any;
+  private removeMediaSpoiler: (...args: any[]) => any;
+  private removeMedia: (...args: any[]) => any;
+  private editPhoto: (...args: any[]) => any;
+
+  private fileDetails: SendFileParams;
+  private appendTo: HTMLElement;
+  private photoButtonsElement: HTMLElement;
+
+  private isAnimating = false;
+
+  private getIsMedia = () => {
+    return this.fileDetails?.itemDiv.classList.contains('popup-item-media');
+  };
+
+  private buttons: ButtonMenuItemOptionsVerifiable[] = [{
+    icon: 'edit',
+    text: 'EnablePhotoSpoiler',
+    onClick: () => {
+      this.editPhoto();
+    },
+    verify: () => !IS_MOBILE
+  }, {
+    icon: 'mediaspoiler',
+    text: 'EnablePhotoSpoiler',
+    onClick: () => {
+      this.updateSpoilers(true);
+    },
+    verify: () => this.getIsMedia() && !this.fileDetails.mediaSpoiler
+  }, {
+    icon: 'mediaspoileroff',
+    text: 'DisablePhotoSpoiler',
+    onClick: () => {
+      this.updateSpoilers(false);
+    },
+    verify: () => !!(this.getIsMedia() && this.fileDetails.mediaSpoiler)
+  }, {
+    icon: 'delete',
+    text: 'EnablePhotoSpoiler',
+    onClick: () => {
+      this.removeMedia();
+    },
+    verify: () => true
+  }]
+
+  public updateSpoilers = (isAddSpoiler: boolean, updateButtonOnly?: boolean) => {
+    if(this.isAnimating) {
+      return;
+    }
+
+    this.isAnimating = true;
+    if(!updateButtonOnly) {
+      if(!isAddSpoiler) {
+        this.removeMediaSpoiler();
+      } else {
+        this.applyMediaSpoiler();
+      }
+    }
+
+    setTimeout(() => {
+      this.isAnimating = false;
+      this.createButtons();
+    }, 200);
+  }
+
+  public createButtons = () => {
+    const container = document.createElement('div');
+    container.classList.add('media-buttons')
+
+    for(const button of this.buttons) {
+      const {icon, onClick, verify} = button;
+
+      if(!verify()) {
+        continue;
+      }
+
+      const iconContainer = document.createElement('button');
+      const el = Icon(icon);
+      ripple(iconContainer);
+      iconContainer.append(el)
+      iconContainer.classList.add('btn-icon')
+
+      if(onClick) {
+        iconContainer.onclick = onClick;
+      }
+
+      container.append(iconContainer);
+    }
+
+    if(this.photoButtonsElement) {
+      this.photoButtonsElement.remove();
+    }
+
+    this.appendTo.append(container);
+    this.photoButtonsElement = container;
+  }
+
+  constructor({
+    fileDetails,
+    removeMedia,
+    applyMediaSpoiler,
+    removeMediaSpoiler,
+    editPhoto
+  }: {
+    fileDetails: SendFileParams,
+    removeMedia: (...args: any[]) => any,
+    applyMediaSpoiler?: (...args: any[]) => any,
+    removeMediaSpoiler?: (...args: any[]) => any,
+    editPhoto?: (...args: any[]) => any,
+  }) {
+    delete fileDetails.photoButtons;
+    this.fileDetails = fileDetails;
+    this.removeMedia = removeMedia;
+    this.applyMediaSpoiler = applyMediaSpoiler;
+    this.removeMediaSpoiler = removeMediaSpoiler;
+    this.editPhoto = editPhoto;
+    this.appendTo = fileDetails.itemDiv;
+    this.createButtons();
+  }
+}
+
+const createMediaButtons = ({
+  appendTo,
+  buttons
+}: {
+  buttons: ButtonMenuItemOptionsVerifiable[],
+  appendTo: HTMLElement
+}) => {
+  const container = document.createElement('div');
+  container.classList.add('media-buttons')
+
+  for(const button of buttons) {
+    const {icon, onClick, verify} = button;
+
+    if(!verify()) continue;
+
+    const iconContainer = document.createElement('button');
+    const el = Icon(icon);
+    ripple(iconContainer);
+    iconContainer.append(el)
+    iconContainer.classList.add('btn-icon')
+
+    if(onClick) {
+      iconContainer.onclick = onClick;
+    }
+
+    container.append(iconContainer);
+  }
+
+  appendTo.append(container);
 }
 
 export default class PopupNewMedia extends PopupElement {
@@ -133,6 +293,34 @@ export default class PopupNewMedia extends PopupElement {
     })
 
     return out;
+  }
+
+  private attachMediaButtons = () => {
+    for(const fileDetails of this.willAttach.sendFileDetails) {
+      if(fileDetails?.photoButtons) {
+        fileDetails.photoButtons.createButtons();
+        continue;
+      }
+
+      console.log(fileDetails);
+
+      fileDetails.photoButtons = new PhotoButtons({
+        fileDetails,
+        removeMedia: async() => {
+          const index = this.willAttach.sendFileDetails.findIndex(({objectURL}) => objectURL === fileDetails.objectURL)
+          await this.removeMedia(index);
+        },
+        editPhoto: () => {
+          openMediaEditor();
+        },
+        applyMediaSpoiler: () => {
+          this.applyMediaSpoiler(fileDetails);
+        },
+        removeMediaSpoiler: () => {
+          this.removeMediaSpoiler(fileDetails);
+        }
+      })
+    }
   }
 
   private async construct(willAttachType: PopupNewMedia['willAttach']['type']) {
@@ -299,32 +487,31 @@ export default class PopupNewMedia extends PopupElement {
       }
     });
 
-    let target: HTMLElement, isMedia: boolean, item: SendFileParams;
-    createContextMenu({
-      buttons: [{
-        icon: 'mediaspoiler',
-        text: 'EnablePhotoSpoiler',
-        onClick: () => {
-          this.applyMediaSpoiler(item);
-        },
-        verify: () => isMedia && !item.mediaSpoiler
-      }, {
-        icon: 'mediaspoileroff',
-        text: 'DisablePhotoSpoiler',
-        onClick: () => {
-          this.removeMediaSpoiler(item);
-        },
-        verify: () => !!(isMedia && item.mediaSpoiler)
-      }],
-      listenTo: this.mediaContainer,
-      listenerSetter: this.listenerSetter,
-      findElement: (e) => {
-        target = findUpClassName(e.target, 'popup-item');
-        isMedia = target.classList.contains('popup-item-media');
-        item = this.willAttach.sendFileDetails.find((i) => i.itemDiv === target);
-        return target;
-      }
-    });
+    // createContextMenu({
+    //   buttons: [{
+    //     icon: 'mediaspoiler',
+    //     text: 'EnablePhotoSpoiler',
+    //     onClick: () => {
+    //       this.applyMediaSpoiler(item);
+    //     },
+    //     verify: () => isMedia && !item.mediaSpoiler
+    //   }, {
+    //     icon: 'mediaspoileroff',
+    //     text: 'DisablePhotoSpoiler',
+    //     onClick: () => {
+    //       this.removeMediaSpoiler(item);
+    //     },
+    //     verify: () => !!(isMedia && item.mediaSpoiler)
+    //   }],
+    //   listenTo: this.mediaContainer,
+    //   listenerSetter: this.listenerSetter,
+    //   findElement: (e) => {
+    //     target = findUpClassName(e.target, 'popup-item');
+    //     isMedia = target.classList.contains('popup-item-media');
+    //     item = this.willAttach.sendFileDetails.find((i) => i.itemDiv === target);
+    //     return target;
+    //   }
+    // });
 
     if(this.chat.type !== ChatType.Scheduled) {
       createRoot((dispose) => {
@@ -545,6 +732,11 @@ export default class PopupNewMedia extends PopupElement {
 
   public changeSpoilers(toggle: boolean) {
     this.partition().media.forEach((item) => {
+      console.log(toggle && !item.mediaSpoiler);
+      if(item.photoButtons) {
+        item.photoButtons.updateSpoilers(toggle && !item.mediaSpoiler, true);
+      }
+
       if(toggle && !item.mediaSpoiler) {
         this.applyMediaSpoiler(item);
       } else if(!toggle && item.mediaSpoiler) {
@@ -686,6 +878,8 @@ export default class PopupNewMedia extends PopupElement {
       }
 
       const d: SendFileDetails[] = sendFileParams.map((params) => {
+        delete params.photoButtons
+
         return {
           ...params,
           file: params.scaledBlob || params.file,
@@ -746,6 +940,17 @@ export default class PopupNewMedia extends PopupElement {
     }
 
     return scaledBlob && {url, blob: scaledBlob};
+  }
+
+  private async removeMedia(index: number) {
+    this.willAttach.sendFileDetails.splice(index, 1);
+    this.files.splice(index, 1);
+
+    if(!this.willAttach.sendFileDetails.length) {
+      this.hide();
+    } else {
+      this.attachFiles();
+    }
   }
 
   private async attachMedia(params: SendFileParams) {
@@ -1009,6 +1214,7 @@ export default class PopupNewMedia extends PopupElement {
 
   private iterate(cb: (sendFileDetails: SendFileParams[]) => void) {
     const {sendFileDetails} = this.willAttach;
+    this.attachMediaButtons();
     if(!this.willAttach.group) {
       sendFileDetails.forEach((p) => cb([p]));
       return;
@@ -1061,8 +1267,9 @@ export default class PopupNewMedia extends PopupElement {
             container: albumContainer,
             items: sendFileDetails.map((o) => ({w: o.width, h: o.height})),
             maxWidth: MAX_WIDTH,
-            minWidth: 100,
-            spacing: 4
+            minWidth: 80,
+            spacing: 4,
+            forMedia: true
           });
 
           mediaContainer.append(albumContainer);
@@ -1083,6 +1290,7 @@ export default class PopupNewMedia extends PopupElement {
           }
 
           if(oldParams.mediaSpoiler) {
+            params.photoButtons.updateSpoilers(true, true)
             this.applyMediaSpoiler(params, true);
           }
         });
