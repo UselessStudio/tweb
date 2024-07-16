@@ -33,6 +33,7 @@ export default class RangeSelector {
   protected withTransition = false;
   protected useTransform = false;
   protected vertical = false;
+  protected fillFromPercent = 0;
 
   constructor(
     options: {
@@ -41,7 +42,9 @@ export default class RangeSelector {
       max?: RangeSelector['max'],
       withTransition?: RangeSelector['withTransition'],
       useTransform?: RangeSelector['useTransform'],
-      vertical?: RangeSelector['vertical']
+      vertical?: RangeSelector['vertical'],
+      // supported only with withTransition
+      fillFromPercent?: RangeSelector['fillFromPercent']
     },
     value = 0
   ) {
@@ -69,6 +72,8 @@ export default class RangeSelector {
 
     if(value) {
       this.setProgress(value);
+    } else if(value == 0) {
+      this.setFilled(0);
     }
 
     const stepStr = '' + this.step;
@@ -123,8 +128,8 @@ export default class RangeSelector {
   };
 
   public setProgress(value: number) {
-    this.seek.value = '' + value;
     this.setFilled(+this.seek.value); // clamp
+    this.seek.value = '' + value;
   }
 
   public addProgress(value: number) {
@@ -138,7 +143,15 @@ export default class RangeSelector {
 
     // using scaleX and width even with vertical because it will be rotated
     if(this.useTransform) {
-      this.filled.style.transform = `scaleX(${percents})`;
+      if(this.fillFromPercent) {
+        const scale = percents - this.fillFromPercent / 100 || -0.00001;
+
+        this.filled.style.left = `${this.fillFromPercent}%`;
+        this.container.style.setProperty('--scale-range-selector', '' + scale)
+        this.filled.style.scale = `${scale} 1 1`
+      } else {
+        this.filled.style.transform = `scaleX(${percents})`;
+      }
     } else {
       this.filled.style.width = (percents * 100) + '%';
     }

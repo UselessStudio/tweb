@@ -68,7 +68,7 @@
       @include respond-to(not-handhelds) {
         pointer-events: none;
       }
-      
+
       @include animation-level(2) {
         transition: opacity var(--layer-transition);
       }
@@ -100,7 +100,7 @@
       margin: 0 16px;
       border-radius: var(--border-radius);
       background: rgba(255, 255, 255, .38);
-  
+
       &__filled {
         background: var(--primary-color);
       }
@@ -108,7 +108,7 @@
       &__loaded {
         background-color: #fff;
       }
-  
+
       @include respond-to(handhelds) {
         margin-bottom: -1px;
       }
@@ -155,7 +155,7 @@
   }
 
   &.show-controls {
-    .default__gradient-bottom, 
+    .default__gradient-bottom,
     .default__controls {
       transform: translateZ(0);
     }
@@ -326,13 +326,14 @@ video::-webkit-media-controls-enclosure {
     &::-moz-range-track,
     &::-webkit-slider-runnable-track {
       -webkit-appearance: none;
-      background: transparent; 
+      background: transparent;
       border-color: transparent;
       color: transparent;
       width: 0;
       height: 0;
     } */
   }
+  --scale-range-selector: 1;
 
   &__filled {
     // padding-right: 1px; // * need because there is border-radius
@@ -344,7 +345,8 @@ video::-webkit-media-controls-enclosure {
 
       &:after {
         content: " ";
-        display: block;
+        scale: calc(1 / var(--scale-range-selector, 1)) 1 1;
+        display: inline-block;
         height: var(--thumb-size);
         width: var(--thumb-size);
         border-radius: 50%;
@@ -353,7 +355,7 @@ video::-webkit-media-controls-enclosure {
         position: absolute;
         inset-inline-end: 0;
         top: calc((var(--thumb-size) - var(--height)) / -2);
-        transform: translateX(calc(var(--thumb-size) / 2 * var(--reflect))) scale(1);
+        transform: translateX(calc(var(--thumb-size) * var(--scale-range-selector, 1) / 2 * var(--reflect))) scale(1);
 
         @include animation-level(2) {
           transition: transform .125s ease-in-out;
@@ -363,7 +365,8 @@ video::-webkit-media-controls-enclosure {
   }
 
   &.is-focused .progress-line__filled:not(.progress-line__loaded):after {
-    transform: translateX(calc(var(--thumb-size) / 2 * var(--reflect))) scale(1.125);
+    transform: translateX(calc(var(--thumb-size) * var(--scale-range-selector, 1) / 2 * var(--reflect))) scale(1.125);
+    scale: calc(1 / var(--scale-range-selector, 1)) 1 1;
   }
 
   &__loaded,
@@ -372,7 +375,7 @@ video::-webkit-media-controls-enclosure {
     background-color: var(--secondary-color);
   }
 
-  &__filled, 
+  &__filled,
   &__loaded {
     border-radius: var(--border-radius);
     position: absolute;
@@ -455,12 +458,12 @@ input[type=range] {
     inset: 0;
     border-radius: inherit;
     border: 2px solid transparent;
-    mask: 
-      linear-gradient(#fff 0 0) padding-box, 
+    mask:
+      linear-gradient(#fff 0 0) padding-box,
       linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
-  
+
     .loading {
       height: calc(100% + 8px);
       margin-top: -4px;
@@ -497,7 +500,7 @@ input[type=range] {
   &.dim-background {
     background: #000;
   }
-  
+
   .bottom-controls {
     padding: .5rem;
     height: auto;

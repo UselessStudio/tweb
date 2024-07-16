@@ -97,7 +97,7 @@ class PhotoButtons {
   };
 
   private buttons: ButtonMenuItemOptionsVerifiable[] = [{
-    icon: 'edit',
+    icon: 'tools',
     text: 'EnablePhotoSpoiler',
     onClick: () => {
       this.editPhoto();
