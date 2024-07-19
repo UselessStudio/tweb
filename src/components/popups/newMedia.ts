@@ -310,8 +310,19 @@ export default class PopupNewMedia extends PopupElement {
           const index = this.willAttach.sendFileDetails.findIndex(({objectURL}) => objectURL === fileDetails.objectURL)
           await this.removeMedia(index);
         },
-        editPhoto: () => {
-          openMediaEditor();
+        editPhoto: async() => {
+          const index = this.willAttach.sendFileDetails.findIndex(({objectURL}) => objectURL === fileDetails.objectURL)
+          const blob = await openMediaEditor(this.willAttach.sendFileDetails[index].objectURL);
+
+          if(blob) {
+            const file = new File([blob], this.files[index].name, {type: 'image/png'});
+            const url = URL.createObjectURL(blob) as string;
+            this.files[index] = file;
+            this.willAttach.sendFileDetails[index].file = file;
+            this.willAttach.sendFileDetails[index].objectURL = url;
+
+            this.attachFiles();
+          }
         },
         applyMediaSpoiler: () => {
           this.applyMediaSpoiler(fileDetails);

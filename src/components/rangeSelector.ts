@@ -144,11 +144,11 @@ export default class RangeSelector {
     // using scaleX and width even with vertical because it will be rotated
     if(this.useTransform) {
       if(this.fillFromPercent) {
-        const scale = percents - this.fillFromPercent / 100 || -0.00001;
+        const scale = percents - this.fillFromPercent / 100 || -0.01;
 
         this.filled.style.left = `${this.fillFromPercent}%`;
-        this.container.style.setProperty('--scale-range-selector', '' + scale)
-        this.filled.style.scale = `${scale} 1 1`
+        this.container.style.setProperty('--scale-range-selector', '' + scale);
+        this.filled.style.scale = `${scale} 1 1`;
       } else {
         this.filled.style.transform = `scaleX(${percents})`;
       }

@@ -382,7 +382,6 @@ export const BrushSelector = () => {
 
   createEffect(() => {
     const target = getTarget();
-    console.log(target);
 
     if(target) {
       const index = brushItems.findIndex(({value}) => {
