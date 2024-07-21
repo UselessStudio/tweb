@@ -55,6 +55,7 @@
     }
 
     body.is-left-column-shown & {
+      z-index: 1;
       transform: translateZ(0);
     }
   }
@@ -305,7 +306,7 @@
       bottom: 0;
       left: 0;
       // z-index: 2;
-      z-index: 2; // over forum
+      z-index: 4; // over forum
       margin: 0;
 
       &.is-visible {

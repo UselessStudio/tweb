@@ -886,6 +886,7 @@ const lang = {
   'Contacts': 'Contacts',
   'SavedMessages': 'Saved Messages',
   'Settings': 'Settings',
+  'More': 'More',
   'SettingsHelp': 'Help',
   'General': 'General',
   'TextSize': 'Message Text Size',

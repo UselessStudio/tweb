@@ -19,8 +19,11 @@ import ripple from './ripple';
 import Icon from './icon';
 import RadioForm from './radioForm';
 import wrapAttachBotIcon from './wrappers/attachBotIcon';
+import callbackify from "../helpers/callbackify.js";
+import ButtonMenuToggle from "./buttonMenuToggle.js";
+import filterAsync from "../helpers/array/filterAsync.js";
 
-type ButtonMenuItemInner = Omit<Parameters<typeof ButtonMenuSync>[0], 'listenerSetter'>;
+type ButtonMenuItemInner = Omit<Parameters<typeof ButtonMenuSync>[0], 'listenerSetter' | 'buttons'> & {buttons: ButtonMenuItemOptionsVerifiable[]};
 export type ButtonMenuItemOptions = {
   icon?: Icon,
   iconDoc?: Document.document,
@@ -163,7 +166,20 @@ function ButtonMenuItem(options: ButtonMenuItemOptions) {
   if(options.inner) {
     el.append(Icon('next', 'btn-menu-item-icon', 'btn-menu-item-icon-right'));
     el.classList.add('has-inner');
-    (el as any).inner = options.inner;
+    // (el as any).inner = options.inner;
+    const inner = typeof options.inner === "function" ? options.inner() : options.inner;
+    callbackify(inner, async (inner) => {
+      const f = (b: (typeof inner.buttons[0])[]) =>
+        filterAsync(b, (button) => button?.verify ? button.verify() ?? false : true);
+
+      const menu = await ButtonMenu({
+        ...inner,
+        buttons: await f(inner.buttons),
+      });
+      menu.classList.add("inner");
+      menu.classList.add("bottom-right");
+      el.after(menu);
+    })
   }
 
   const ret: HTMLElement[] = [options.element = el];

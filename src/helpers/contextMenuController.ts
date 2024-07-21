@@ -33,17 +33,41 @@ class ContextMenuController extends OverlayClickHandler {
     return !!this.element;
   }
 
+  private isOutOfRange(x: number, y: number,
+                        {top, bottom, right, left}: {top: number, bottom: number, left: number, right: number}): boolean {
+    const diffX = x >= right ? x - right : left - x;
+    const diffY = y >= bottom ? y - bottom : top - y;
+    return diffX >= 100 || diffY >= 100;
+  }
+
   private onMouseMove = (e: MouseEvent) => {
     const element = findUpClassName(e.target, 'btn-menu-item');
-    const inner = (element as any)?.inner as ButtonMenuItemOptions['inner'];
+    // const inner = (element as any)?.inner as ButtonMenuItemOptions['inner'];
+
+    const inner = this.element.querySelector(".inner.btn-menu") as HTMLElement;
+    if(element?.classList.contains("has-inner")) {
+      inner.classList.add("active");
+    }
+
+    const {clientX, clientY} = e;
+    const innerButton = this.element.querySelector(".btn-menu-item.has-inner");
+    const innerRect = this.element.querySelector(".inner.active")?.getBoundingClientRect();
+    if(innerButton && innerRect
+      && this.isOutOfRange(clientX, clientY, innerButton.getBoundingClientRect())
+      && this.isOutOfRange(clientX, clientY, innerRect)) {
+      // console.log(innerButton.getBoundingClientRect());
+      inner.classList.remove("active");
+    }
 
     const rect = this.element.getBoundingClientRect();
-    const {clientX, clientY} = e;
+    const fullRect = innerRect == null ? rect : {
+      top: Math.min(rect.top, innerRect.top),
+      bottom: Math.max(rect.bottom, innerRect.bottom),
+      right: Math.max(rect.right, innerRect.right),
+      left: Math.min(rect.left, innerRect.left)
+    };
 
-    const diffX = clientX >= rect.right ? clientX - rect.right : rect.left - clientX;
-    const diffY = clientY >= rect.bottom ? clientY - rect.bottom : rect.top - clientY;
-
-    if(diffX >= 100 || diffY >= 100) {
+    if(this.isOutOfRange(clientX, clientY, fullRect)) {
       this.close();
       // openedMenu.parentElement.click();
     }

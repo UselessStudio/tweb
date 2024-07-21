@@ -22,7 +22,7 @@ import AppArchivedTab from './tabs/archivedTab';
 import AppAddMembersTab from './tabs/addMembers';
 import I18n, {i18n} from '../../lib/langPack';
 import AppPeopleNearbyTab from './tabs/peopleNearby';
-import {ButtonMenuItemOptions} from '../buttonMenu';
+import {ButtonMenuItemOptions, ButtonMenuSync} from '../buttonMenu';
 import CheckboxField from '../checkboxField';
 import {IS_MOBILE_SAFARI} from '../../environment/userAgent';
 import appNavigationController, {NavigationItem} from '../appNavigationController';
@@ -184,72 +184,80 @@ export class AppSidebarLeft extends SidebarSlider {
         this.createTab(AppPeopleNearbyTab).open();
       }
     } : undefined, {
+      separator: true,
       icon: 'settings',
       text: 'Settings',
       onClick: () => {
         this.createTab(AppSettingsTab).open();
       }
     }, {
-      icon: 'darkmode',
-      text: 'DarkMode',
-      onClick: () => {
+      icon: 'more',
+      text: 'More',
+      checkForClose: () => false,
+      onClick: () => {},
+      inner: {
+        buttons: [{
+          icon: 'darkmode',
+          text: 'DarkMode',
+          onClick: () => {
 
-      },
-      checkboxField: themeCheckboxField
-    }, {
-      icon: 'animations',
-      text: 'Animations',
-      onClick: () => {
+          },
+          checkboxField: themeCheckboxField
+        }, {
+          icon: 'animations',
+          text: 'Animations',
+          onClick: () => {
 
-      },
-      checkboxField: new CheckboxField({
-        toggle: true,
-        checked: liteMode.isAvailable('animations'),
-        stateKey: joinDeepPath('settings', 'liteMode', 'animations'),
-        stateValueReverse: true
-      }),
-      verify: () => !liteMode.isEnabled()
-    }, {
-      icon: 'animations',
-      text: 'LiteMode.Title',
-      onClick: () => {
-        this.createTab(AppPowerSavingTab).open();
-      },
-      verify: () => liteMode.isEnabled()
-    }, {
-      icon: 'help',
-      text: 'TelegramFeatures',
-      onClick: () => {
-        const url = I18n.format('TelegramFeaturesUrl', true);
-        appImManager.openUrl(url);
-      }
-    }, {
-      icon: 'bug',
-      text: 'ReportBug',
-      onClick: () => {
-        const a = document.createElement('a');
-        setBlankToAnchor(a);
-        a.href = 'https://bugs.telegram.org/?tag_ids=40&sort=time';
-        document.body.append(a);
-        a.click();
-        setTimeout(() => {
-          a.remove();
-        }, 0);
-      }
-    }, {
-      icon: 'char' as Icon,
-      className: 'a',
-      text: 'ChatList.Menu.SwitchTo.A',
-      onClick: () => {
-        Promise.all([
-          sessionStorage.set({kz_version: 'Z'}),
-          sessionStorage.delete('tgme_sync')
-        ]).then(() => {
-          location.href = 'https://web.telegram.org/a/';
-        });
-      },
-      verify: () => App.isMainDomain
-    }, /* {
+          },
+          checkboxField: new CheckboxField({
+            toggle: true,
+            checked: liteMode.isAvailable('animations'),
+            stateKey: joinDeepPath('settings', 'liteMode', 'animations'),
+            stateValueReverse: true
+          }),
+          verify: () => !liteMode.isEnabled()
+        }, {
+          icon: 'animations',
+          text: 'LiteMode.Title',
+          onClick: () => {
+            this.createTab(AppPowerSavingTab).open();
+          },
+          verify: () => liteMode.isEnabled()
+        }, {
+          separator: true,
+          icon: 'help',
+          text: 'TelegramFeatures',
+          onClick: () => {
+            const url = I18n.format('TelegramFeaturesUrl', true);
+            appImManager.openUrl(url);
+          }
+        }, {
+          icon: 'bug',
+          text: 'ReportBug',
+          onClick: () => {
+            const a = document.createElement('a');
+            setBlankToAnchor(a);
+            a.href = 'https://bugs.telegram.org/?tag_ids=40&sort=time';
+            document.body.append(a);
+            a.click();
+            setTimeout(() => {
+              a.remove();
+            }, 0);
+          }
+        }, {
+          icon: 'char' as Icon,
+          className: 'a',
+          text: 'ChatList.Menu.SwitchTo.A',
+          onClick: () => {
+            Promise.all([
+              sessionStorage.set({kz_version: 'Z'}),
+              sessionStorage.delete('tgme_sync')
+            ]).then(() => {
+              location.href = 'https://web.telegram.org/a/';
+            });
+          },
+          verify: () => App.isMainDomain
+        }, /* {
       icon: 'char w',
       text: 'ChatList.Menu.SwitchTo.Webogram',
       onClick: () => {
@@ -259,13 +267,15 @@ export class AppSidebarLeft extends SidebarSlider {
       },
       verify: () => App.isMainDomain
     }, */ {
-      icon: 'plusround',
-      text: 'PWA.Install',
-      onClick: () => {
-        const installPrompt = getInstallPrompt();
-        installPrompt?.();
+          icon: 'plusround',
+          text: 'PWA.Install',
+          onClick: () => {
+            const installPrompt = getInstallPrompt();
+            installPrompt?.();
+          },
+          verify: () => !!getInstallPrompt(),
+        }]
       },
-      verify: () => !!getInstallPrompt()
     }];
 
     const filteredButtons = menuButtons.filter(Boolean);
@@ -278,9 +288,10 @@ export class AppSidebarLeft extends SidebarSlider {
         const buttons = filteredButtonsSliced.slice();
         const attachMenuBotsButtons = attachMenuBots.filter((attachMenuBot) => {
           return attachMenuBot.pFlags.show_in_side_menu;
-        }).map((attachMenuBot) => {
+        }).map((attachMenuBot, index) => {
           const icon = getAttachMenuBotIcon(attachMenuBot);
           const button: typeof buttons[0] = {
+            separator: index === 0,
             regularText: wrapEmojiText(attachMenuBot.short_name),
             onClick: () => {
               appImManager.openWebApp({
@@ -297,7 +308,7 @@ export class AppSidebarLeft extends SidebarSlider {
           return button;
         });
 
-        buttons.splice(3, 0, ...attachMenuBotsButtons);
+        buttons.splice(3 + (btnArchive.verify() ? 1 : 0), 0, ...attachMenuBotsButtons);
         filteredButtons.splice(0, filteredButtons.length, ...buttons);
       },
       onOpen: (e, btnMenu) => {
@@ -313,8 +324,9 @@ export class AppSidebarLeft extends SidebarSlider {
         t.classList.add('btn-menu-footer-text');
         t.textContent = 'Telegram Web' + App.suffix + ' '/* ' alpha ' */ + App.versionFull;
         btnMenuFooter.append(t);
-        btnMenu.classList.add('has-footer');
-        btnMenu.append(btnMenuFooter);
+        const inner = btnMenu.querySelector(".inner");
+        inner.classList.add('has-footer');
+        inner.append(btnMenuFooter);
 
         const a = btnMenu.querySelector('.a .btn-menu-item-icon');
         if(a) a.textContent = 'A';
