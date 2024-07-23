@@ -10,273 +10,11 @@ import Scrollable from '../scrollable';
 import classNames from '../../helpers/string/classNames';
 import ColorPicker from '../colorPicker';
 import ripple from '../ripple';
-import {BrushSelector} from './brushItems';
+import {brushItems, BrushSelector} from './brushItems';
 import StickersTab from './stickers/Stickers';
 import rootScope from '../../lib/rootScope';
 import {EmoticonsDropdown} from '../emoticonsDropdown';
-
-import {changeBrightness, hexaToRgba, hexToRgb} from '../../helpers/color';
-
-class Layer {
-  protected context2d: CanvasRenderingContext2D;
-  public canvas: HTMLCanvasElement;
-  public renderedElement: HTMLElement;
-
-  constructor({
-    canvasWidth,
-    canvasHeight,
-    renderedElement
-  }: {
-    renderedElement?: HTMLElement,
-    canvasWidth?: number,
-    canvasHeight?: number,
-  }) {
-    this.canvas = document.createElement('canvas');
-
-    if(renderedElement) {
-      this.renderedElement = renderedElement;
-    }
-
-    if(canvasHeight) {
-      this.canvas.height = canvasHeight * 2;
-    }
-
-    if(canvasWidth) {
-      this.canvas.width = canvasWidth * 2;
-    }
-  }
-
-  public async process(): Promise<HTMLImageElement> {
-    return new Promise((resolve) => {
-      this.canvas.toBlob((blob) => {
-        const url = URL.createObjectURL(blob);
-        const image = new Image();
-        image.src = url;
-        image.onload = () => {
-          resolve(image)
-        }
-      }, 'image/png', 1);
-    })
-  }
-}
-
-class PaintingLayer extends Layer {
-  protected isDrawing = false;
-  protected color: string = '#2478d5';
-  protected size: number = 42;
-
-  constructor({
-    canvasWidth,
-    canvasHeight,
-    renderedElement,
-    color,
-    size
-  }: {
-    renderedElement?: HTMLElement,
-    canvasWidth?: number,
-    canvasHeight?: number,
-    color?: string,
-    size?: number,
-  }) {
-    super({
-      canvasWidth,
-      canvasHeight,
-      renderedElement
-    });
-
-    this.renderedElement = this.canvas;
-  }
-
-  public listenToEvents() {
-    this.renderedElement.addEventListener('mousedown', this.onTouchStart.bind(this));
-    this.renderedElement.addEventListener('mouseup', this.onTouchEnd.bind(this));
-    this.renderedElement.addEventListener('mousemove', this.draw.bind(this));
-  }
-
-  public attachTo(element: HTMLElement) {
-    element.append(this.canvas);
-    this.context2d = this.canvas.getContext('2d');
-  }
-
-  public updateColor(color: string) {
-    this.color = color;
-  }
-
-  public updateSize(size: number) {
-    this.size = size;
-  }
-
-  protected getRealSizePerRendererSize() {
-    const bcr = this.canvas.getBoundingClientRect();
-
-    return this.canvas.width / bcr.width;
-  }
-
-  protected draw(event: MouseEvent) {
-    if(!this.isDrawing) {
-      return;
-    }
-
-    const bcr = (event.target as HTMLElement).getBoundingClientRect();
-    const relativeX = (event.clientX - bcr.left) * this.getRealSizePerRendererSize();
-    const relativeY = (event.clientY - bcr.top) * this.getRealSizePerRendererSize();
-
-    this.context2d.lineWidth = this.size * this.getRealSizePerRendererSize();
-    this.context2d.strokeStyle = this.color;
-    this.context2d.lineCap = 'round';
-    this.context2d.lineTo(relativeX, relativeY);
-    this.context2d.stroke();
-    this.context2d.beginPath();
-    this.context2d.moveTo(relativeX, relativeY);
-
-    this.context2d.globalCompositeOperation = 'lighter';
-  }
-
-  protected onTouchStart() {
-    this.isDrawing = true;
-  }
-
-  protected onTouchEnd() {
-    this.isDrawing = false;
-    this.context2d.beginPath();
-  }
-}
-
-class ArrowPaintingLayer extends PaintingLayer {
-  private stack: Array<{ x: number, y: number }> = [];
-
-  private getDistance(x1: number, y1: number, x2: number, y2: number) {
-    return Math.sqrt(Math.abs(x1 - x2) ** 2 + Math.abs(y1 - y2) ** 2);
-  }
-
-  protected draw(event: MouseEvent) {
-    if(!this.isDrawing) {
-      return;
-    }
-
-    super.draw(event);
-
-    const bcr = (event.target as HTMLElement).getBoundingClientRect();
-    const x = (event.clientX - bcr.left) * this.canvas.width / bcr.width;
-    const y = (event.clientY - bcr.top) * this.canvas.height / bcr.height;
-
-    if(this.stack.length < 3) {
-      this.stack.unshift({x, y});
-    } else if(this.getDistance(this.stack[0].x, this.stack[0].y, x, y) >= 4 * this.canvas.height / bcr.height) {
-      this.stack.unshift({x, y});
-    }
-  };
-
-  private getArrowPoints = (x: number, y: number, x1: number, y1: number) => {
-    const PRIMARY_ANGLE = 30;
-    const length = this.size * 4 * this.getRealSizePerRendererSize();
-
-    const b = PRIMARY_ANGLE * Math.PI / 180 + Math.atan2(y1 - y, x1 - x);
-    const b1 = (360 - PRIMARY_ANGLE) * Math.PI / 180 + Math.atan2(y1 - y, x1 - x);
-
-    return [{
-      x: x + Math.cos(b) * length,
-      y: y + Math.sin(b) * length
-    }, {
-      x: x + Math.cos(b1) * length,
-      y: y + Math.sin(b1) * length
-    }];
-  }
-
-  protected onTouchEnd() {
-    super.onTouchEnd();
-
-    if(this.stack.length < 3) {
-      return;
-    }
-
-    const {x, y} = this.stack[0];
-    const {x: x1, y: y1} = this.stack.slice(0, Math.min(this.stack.length, 3)).reduce((prev, current) => {
-      return {
-        x: prev.x + current.x,
-        y: prev.y + current.y
-      }
-    }, {x: 0, y: 0});
-    const midX1 = x1 / Math.min(this.stack.length, 3);
-    const mixY1 = y1 / Math.min(this.stack.length, 3);
-
-    this.getArrowPoints(x, y, midX1, mixY1)
-    .map(({
-      x: arrowPointX,
-      y: arrowPointY
-    }) => {
-      this.context2d.lineWidth = this.size * this.getRealSizePerRendererSize();
-      this.context2d.strokeStyle = this.color;
-      this.context2d.lineCap = 'round';
-      this.context2d.beginPath();
-      this.context2d.moveTo(x, y);
-      this.context2d.lineTo(arrowPointX, arrowPointY);
-      this.context2d.stroke();
-      this.context2d.beginPath();
-    })
-
-    this.stack = [];
-  }
-}
-
-class NeonPaintingLayer extends PaintingLayer {
-  neonCanvas: HTMLCanvasElement;
-  neonContext2d: CanvasRenderingContext2D;
-  hasBeginPath: boolean;
-
-  public attachTo(element: HTMLElement) {
-    element.append(this.canvas);
-    this.context2d = this.canvas.getContext('2d');
-    this.neonCanvas = document.createElement('canvas');
-    this.neonCanvas.width = this.canvas.width;
-    this.neonCanvas.height = this.canvas.height;
-    this.neonContext2d = this.neonCanvas.getContext('2d');
-  }
-
-  protected draw(event: MouseEvent) {
-    if(!this.isDrawing) {
-      return;
-    }
-
-    const bcr = (event.target as HTMLElement).getBoundingClientRect();
-    const x = (event.clientX - bcr.left) * this.canvas.width / bcr.width;
-    const y = (event.clientY - bcr.top) * this.canvas.height / bcr.height;
-
-    this.neonContext2d.lineWidth = (this.size + 5) * this.getRealSizePerRendererSize();
-    this.neonContext2d.shadowBlur = (this.size / 2) * this.getRealSizePerRendererSize();
-    this.neonContext2d.shadowColor = this.color;
-    this.neonContext2d.strokeStyle = `rgba(255 255 255 / 40%)`;
-    this.neonContext2d.lineJoin = 'round';
-    this.neonContext2d.lineCap = 'round';
-    this.neonContext2d.lineTo(x, y);
-    this.neonContext2d.stroke();
-    this.neonContext2d.beginPath();
-    this.neonContext2d.moveTo(x, y);
-
-    this.context2d.drawImage(this.neonCanvas, 0, 0, this.canvas.width, this.canvas.height);
-    this.neonContext2d.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-    this.context2d.lineWidth = this.size * this.getRealSizePerRendererSize();
-    this.context2d.strokeStyle = 'white';
-    this.context2d.lineJoin = 'round';
-    this.context2d.lineCap = 'round';
-    if(!this.hasBeginPath) {
-      this.context2d.beginPath();
-      this.hasBeginPath = true;
-    }
-    this.context2d.lineTo(x, y);
-    this.context2d.stroke();
-    this.context2d.moveTo(x, y);
-  };
-
-  protected onTouchEnd() {
-    super.onTouchEnd();
-    this.neonContext2d.beginPath();
-
-    this.hasBeginPath = false;
-  }
-}
-
+import {PaintingInfo, PaintingLayer} from './brushItems';
 
 class Editor {
   workSpaceEditorElement: HTMLElement;
@@ -286,7 +24,12 @@ class Editor {
   initialWidth: number;
   initialHeight: number;
   resizeObserver: ResizeObserver;
-  paintingLayers: PaintingLayer[] = [];
+  paintingLayer: PaintingLayer;
+  paintingLayerCanvas: HTMLCanvasElement;
+  paintingInfo: { size: number, color: string} = {
+    size: 20,
+    color: '#ffffff'
+  }
 
   constructor({
     editorElement
@@ -294,6 +37,7 @@ class Editor {
     editorElement: HTMLElement
   }) {
     this.editorElement = editorElement;
+    this.paintingLayerCanvas = document.createElement('canvas');
   }
 
   public setMediaObjectUrl(url: string) {
@@ -362,36 +106,49 @@ class Editor {
         this.image.style.left = '0px';
         this.image.style.top = '0px';
 
+        this.paintingLayerCanvas.style.position = 'absolute';
+        this.paintingLayerCanvas.style.left = this.paintingLayerCanvas.style.left = '0px';
+        this.paintingLayerCanvas.style.width = this.paintingLayerCanvas.style.height = '100%';
+        this.paintingLayerCanvas.style.background = 'transparent';
+        this.paintingLayerCanvas.style.zIndex = '2';
+        this.paintingLayerCanvas.height = this.image.height * 2;
+        this.paintingLayerCanvas.width = this.image.width * 2;
+
+        this.workSpaceEditorElement.append(this.paintingLayerCanvas);
+
         this.resizeObserver.observe(this.editorElement);
         this.initialHeight = this.image.height;
         this.initialWidth = this.image.width;
         this.workSpaceEditorElement.append(this.image);
         this.resize();
-        this.addNewPaintLayer();
         resolve(this.workSpaceEditorElement);
       }
     })
   }
 
-  public addNewPaintLayer(
-    color?: string,
-    size?: number
-  ) {
-    const paintingLayer = new NeonPaintingLayer({
-      canvasWidth: this.initialWidth,
-      canvasHeight: this.initialHeight,
-      color,
-      size
+  public detachPaintingLayer() {
+    if(this.paintingLayer) {
+      this.paintingLayer.detach();
+    }
+  }
+
+  public attachPaintingLayer(paintingLayer: PaintingLayer) {
+    this.detachPaintingLayer();
+    this.paintingLayer = paintingLayer;
+
+    paintingLayer.attach({
+      canvas: this.paintingLayerCanvas,
+      renderedElement: this.image
     });
+  }
 
-    paintingLayer.canvas.style.position = 'absolute';
-    paintingLayer.canvas.style.left = paintingLayer.canvas.style.left = '0px';
-    paintingLayer.canvas.style.width = paintingLayer.canvas.style.height = '100%';
-    paintingLayer.canvas.style.background = 'transparent';
+  public setPaintingInfo({size, color}: PaintingInfo) {
+    this.paintingInfo.size = size || this.paintingInfo.size;
+    this.paintingInfo.color = color || this.paintingInfo.color;
 
-    paintingLayer.attachTo(this.workSpaceEditorElement);
-    paintingLayer.listenToEvents();
-    this.paintingLayers.push(paintingLayer);
+    if(this.paintingLayer) {
+      this.paintingLayer.setPaintingInfo({size, color});
+    }
   }
 
   public destroy() {
@@ -399,16 +156,15 @@ class Editor {
   }
 
   public async process(): Promise<Blob> {
+    this.detachPaintingLayer()
+
     const canvas = document.createElement('canvas');
     canvas.width = this.initialWidth;
     canvas.height = this.initialHeight;
 
     const context = canvas.getContext('2d');
     context.drawImage(this.image, 0, 0, this.initialWidth, this.initialHeight);
-
-    for(const paintLayer of this.paintingLayers) {
-      context.drawImage(await paintLayer.process(), 0, 0, this.initialWidth, this.initialHeight);
-    }
+    context.drawImage(this.paintingLayerCanvas, 0, 0, this.initialWidth, this.initialHeight);
 
     return new Promise((resolve) => {
       canvas.toBlob((blob) => {
@@ -824,14 +580,44 @@ export const EffectsController = () => {
   )
 }
 
-export const PaintController = ({
-  getRenderPicker
-} : {
-  getRenderPicker:() => boolean
-}) => {
+const usePaintController = () => {
+  const [getBrash, setBrash] = createSignal(brushItems[0].value);
+  const [getBrashSize, setBrashSize] = createSignal<number>(20);
   const {getColor, setColor, getIsColorPickerActive, setIsColorPickerActive} = useColorPicker();
-  const [getSize, setSize] = createSignal(24);
 
+  return {
+    getColor,
+    setColor,
+    getIsColorPickerActive,
+    setIsColorPickerActive,
+    getBrash,
+    setBrash,
+    getBrashSize,
+    setBrashSize
+  }
+}
+
+export const PaintController = ({
+  getRenderPicker,
+  getColor,
+  setColor,
+  getIsColorPickerActive,
+  setIsColorPickerActive,
+  getBrash,
+  setBrash,
+  getBrashSize,
+  setBrashSize
+} : {
+  getRenderPicker:() => boolean,
+  getColor: () => string,
+  setColor: (color: string) => void,
+  getIsColorPickerActive: () => boolean,
+  setIsColorPickerActive: (isActive: boolean) => void,
+  getBrash: () => string,
+  setBrash: (color: string) => void,
+  getBrashSize: () => number,
+  setBrashSize: (size: number) => void,
+}) => {
   return (
     <SimpleScrollableYTsx class={'media-editor-container-toolbar-section media-editor-container-toolbar-effects'}>
       {getRenderPicker() && <MediaEditorColorPicker
@@ -843,8 +629,8 @@ export const PaintController = ({
       <div class={'media-editor-container-size-range'}>
         <MediaEditorRangeItem
           name={'size'}
-          getValue={getSize}
-          setValue={setSize}
+          getValue={getBrashSize}
+          setValue={setBrashSize}
           min={12}
           max={72}
           fillFromMiddle={false}
@@ -852,7 +638,7 @@ export const PaintController = ({
           getColor={getColor}
         />
       </div>
-      <BrushSelector />
+      <BrushSelector setBrash={setBrash} getBrash={getBrash} />
     </SimpleScrollableYTsx>
   )
 }
@@ -1011,6 +797,23 @@ export const TextController = ({
   )
 }
 
+class Draggable {
+  isDragging: boolean;
+  target: HTMLElement;
+
+  constructor(traget: ) {
+
+  }
+
+  function startDragging() {
+    this.isDragging = true;
+  }
+
+  function dragging() {
+    this.isDragging = true;
+  }
+}
+
 const aspectRatioItems = [
   {
     value: 'free',
@@ -1149,13 +952,42 @@ export const MediaEditor = ({
   close: (blob?: Blob) => void,
   url: string
 }) => {
+  const {getColor, setColor, getIsColorPickerActive, setIsColorPickerActive, getBrash, setBrash, setBrashSize, getBrashSize} = usePaintController();
   const [tab, setTab] = createSignal(0);
   let mediaEditorRef: HTMLDivElement;
   let editor: Editor;
 
   onMount(() => {
-    editor = new Editor({editorElement: mediaEditorRef})
+    editor = new Editor({editorElement: mediaEditorRef});
     editor.init(url);
+  })
+
+  onCleanup(() => {
+    editor.destroy();
+  })
+
+  const getIsPaintControllerOpen = () => tab() === 3;
+
+  createEffect(() => {
+    const brush = brushItems.find(({value}) => value === getBrash())
+
+    if(brush && getIsPaintControllerOpen()) {
+      const layer = new brush.Layer() as unknown as PaintingLayer;
+      editor.attachPaintingLayer(layer);
+      editor.setPaintingInfo({
+        color: getColor(),
+        size: getBrashSize()
+      });
+    } else {
+      editor.detachPaintingLayer();
+    }
+  });
+
+  createEffect(() => {
+    editor.setPaintingInfo({
+      color: getColor(),
+      size: getBrashSize()
+    })
   })
 
   const onProcess = async() => {
@@ -1204,7 +1036,17 @@ export const MediaEditor = ({
             <EffectsController />,
             <ScreenAspectRatioController />,
             <TextController getRenderPicker={() => tab() === 2} />,
-            <PaintController getRenderPicker={() => tab() === 3} />,
+            <PaintController
+              getRenderPicker={() => tab() === 3}
+              getColor={getColor}
+              setColor={setColor}
+              getIsColorPickerActive={getIsColorPickerActive}
+              setIsColorPickerActive={setIsColorPickerActive}
+              getBrash={getBrash}
+              setBrash={setBrash}
+              getBrashSize={getBrashSize}
+              setBrashSize={setBrashSize}
+            />,
             <> {tab() === 4 && <StickersController />} </>
           ]}
         />
