@@ -575,6 +575,7 @@ export class AppImManager extends EventListenerBase<{
     });
 
     apiManagerProxy.addEventListener('notificationBuild', async(options) => {
+      console.log("notify", options);
       const isForum = await this.managers.appPeersManager.isForum(options.message.peerId);
       const threadId = getMessageThreadId(options.message, isForum);
       if(this.chat.peerId === options.message.peerId && this.chat.threadId === threadId && !idleController.isIdle) {

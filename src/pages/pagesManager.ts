@@ -10,6 +10,10 @@ import {horizontalMenu} from '../components/horizontalMenu';
 import {MOUNT_CLASS_TO} from '../config/debug';
 import fastSmoothScroll from '../helpers/fastSmoothScroll';
 import whichChild from '../helpers/dom/whichChild';
+import ButtonIcon from "../components/buttonIcon.js";
+import appRuntimeManager from "../lib/appManagers/appRuntimeManager.js";
+import rootScope from "../lib/rootScope.js";
+import sessionStorage from "../lib/sessionStorage.js";
 
 class PagesManager {
   private pageId = -1;
@@ -52,6 +56,20 @@ class PagesManager {
           position: 'start'
         });
       }
+
+      const buttonContainer: HTMLDivElement = this.pagesDiv.querySelector(".return-button");
+      const button = ButtonIcon('close');
+      button.addEventListener("click", async () => {
+        await rootScope.managers.appStateManager.pushToState("authState", {_: "authStateSignedIn"});
+        appRuntimeManager.reload();
+      })
+
+      buttonContainer.replaceChildren(button);
+
+      sessionStorage.get("accounts").then(accounts => {
+        let count = Object.keys(accounts ?? {}).length;
+        buttonContainer.style.display = count > 0 ? '' : 'none';
+      })
     } else {
       this.pagesDiv.style.display = 'none';
       page.pageEl.style.display = '';

@@ -8,6 +8,7 @@ export type DcServerSalt = `dc${TrueDcId}_server_salt`;
 
 export type InvokeApiOptions = Partial<{
   dcId: DcId,
+  forceAccount: PeerId | "anonymous",
   floodMaxTimeout: number,
   noErrorBox: true,
   fileUpload: true,
@@ -94,8 +95,12 @@ export type PickByType<T, Value> = {
   [P in keyof T as T[P] extends Value | undefined ? P : never]: T[P]
 };
 
-export type AuthState = AuthState.signIn | AuthState.signQr | AuthState.authCode | AuthState.password | AuthState.signUp | AuthState.signedIn | AuthState.signImport;
+export type AuthState = AuthState.addAccount | AuthState.signIn | AuthState.signQr | AuthState.authCode | AuthState.password | AuthState.signUp | AuthState.signedIn | AuthState.signImport;
 export namespace AuthState {
+  export type addAccount = {
+    _: 'authStateAddAccount'
+  };
+
   export type signIn = {
     _: 'authStateSignIn'
   };

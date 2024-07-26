@@ -292,8 +292,8 @@ class ApiManagerProxy extends MTProtoMessagePort {
     rootScope.addEventListener('logging_out', () => {
       const toClear: CacheStorageDbName[] = ['cachedFiles', 'cachedStreamChunks'];
       Promise.all([
-        toggleStorages(false, true),
-        sessionStorage.clear(),
+        // toggleStorages(false, true),
+        // sessionStorage.clear(),
         Promise.race([
           telegramMeWebManager.setAuthorized(false),
           pause(3000)

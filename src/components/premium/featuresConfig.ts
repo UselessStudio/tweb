@@ -178,9 +178,12 @@ const doubleLimits: PremiumPromoFeature = {
   }, {
     titleLangKey: 'ConnectedAccountsLimitTitle',
     subtitleLangKey: 'ConnectedAccountsLimitSubtitle',
-    subtitleLangArgs: [4],
-    free: 3,
-    premium: 4,
+    // subtitleLangArgs: [4],
+    // free: 3,
+    // premium: 4,
+    _subtitleLangArgs: wrapGetLimitArgument('accounts'),
+    limitType: 'accounts',
+
     backgroundColor: '#F1822A'
   }]
 };

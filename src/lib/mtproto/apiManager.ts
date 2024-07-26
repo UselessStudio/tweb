@@ -35,6 +35,7 @@ import toggleStorages from '../../helpers/toggleStorages';
 import tsNow from '../../helpers/tsNow';
 import transportController from './transports/controller';
 import MTTransport from './transports/transport';
+import rootScope from "../rootScope.js";
 
 /* class RotatableArray<T> {
   public array: Array<T> = [];
@@ -251,22 +252,56 @@ export class ApiManager extends ApiManagerMethods {
   }
 
   public async setUserAuth(userAuth: UserAuth | UserId) {
+    console.log("setting auth", userAuth);
     if(typeof(userAuth) === 'string' || typeof(userAuth) === 'number') {
       userAuth = {dcID: 0, date: tsNow(true), id: userAuth.toPeerId(false)};
     }
-
-    this.rootScope.dispatchEvent('user_auth', userAuth);
 
     if(!userAuth.dcID) {
       const baseDcId = await this.getBaseDcId();
       userAuth.dcID = baseDcId;
     }
 
-    sessionStorage.set({
-      user_auth: userAuth
+    const ss = 'dc' + userAuth.dcID + '_server_salt' as any;
+    const ak = 'dc' + userAuth.dcID + '_auth_key' as any;
+    Promise.all([ss, ak].map((key) => sessionStorage.get(key)))
+      .then(async ([serverSalts, authKeys]) => {
+        const id = (userAuth as UserAuth).id;
+        if(!(id in serverSalts)) {
+          await sessionStorage.set({
+            [ak]: {...authKeys, [id]: authKeys['anonymous']},
+            [ss]: {...serverSalts, [id]: serverSalts['anonymous']}
+          });
+        }
     });
 
+    await sessionStorage.set({
+      user_auth: userAuth.id,
+      accounts: {...(await sessionStorage.get("accounts")), [userAuth.id]: userAuth},
+    });
+
+    this.removeAccountFromStorage("anonymous");
+
+    this.rootScope.dispatchEvent('user_auth', userAuth);
     // this.telegramMeNotify(true);
+  }
+
+  private async removeAccountFromStorage(account: PeerId | "anonymous") {
+    console.log("removing", account);
+    const keys: string[] = [];
+    for (let i = 1; i <= 5; i++) {
+      keys.push(`dc${i}_server_salt`, `dc${i}_auth_key`, `accounts`)
+    }
+
+    await Promise.all(keys.map((key) => sessionStorage.get(key as any))).then((values: (Record<PeerId | "anonymous", string> | null)[]) => {
+      for (let i = 0; i < values.length; i++) {
+        if(!values[i]) continue;
+        delete values[i][account];
+      }
+      console.log("value", values);
+      return sessionStorage.set(Object.fromEntries(keys.map((k, i) => [k, values[i]])
+        .filter(([_, v]) => v)));
+    });
   }
 
   public setBaseDcId(dcId: DcId) {
@@ -290,27 +325,31 @@ export class ApiManager extends ApiManagerMethods {
     }
 
     this.loggingOut = true;
-    const storageKeys: Array<DcAuthKey> = [];
+    const storageKeys: string[] = [];
 
     const prefix = 'dc';
     for(let dcId = 1; dcId <= 5; dcId++) {
-      storageKeys.push(prefix + dcId + '_auth_key' as any);
+      storageKeys.push(prefix + dcId);
     }
 
     // WebPushApiManager.forceUnsubscribe(); // WARNING // moved to worker's master
-    const storageResult = await Promise.all(storageKeys.map((key) => sessionStorage.get(key)));
+    const user = rootScope.myId || await sessionStorage.get("user_auth");
+    const keys = await Promise.all(storageKeys.map((key) => sessionStorage.get(key + '_auth_key' as any)));
 
     const logoutPromises: Promise<any>[] = [];
-    for(let i = 0; i < storageResult.length; i++) {
-      if(storageResult[i]) {
+    for(let i = 0; i < storageKeys.length; i++) {
+      if(keys[i] && user in keys[i]) {
         logoutPromises.push(this.invokeApi('auth.logOut', {}, {dcId: (i + 1) as DcId, ignoreErrors: true}));
       }
     }
 
     const clear = async() => {
       this.baseDcId = undefined;
+      await this.removeAccountFromStorage(user);
+      sessionStorage.delete("user_auth");
+      sessionStorage.delete("state_id");
       // this.telegramMeNotify(false);
-      await toggleStorages(false, true);
+      // await toggleStorages(false, true);
       IDB.closeDatabases();
       this.rootScope.dispatchEvent('logging_out');
     };
@@ -326,11 +365,11 @@ export class ApiManager extends ApiManagerMethods {
     }) */;
   }
 
-  private generateNetworkerGetKey(dcId: DcId, transportType: TransportType, connectionType: ConnectionType) {
-    return [dcId, transportType, connectionType].join('-');
+  private generateNetworkerGetKey(dcId: DcId, currentAuth: PeerId | "anonymous", transportType: TransportType, connectionType: ConnectionType) {
+    return [dcId, currentAuth, transportType, connectionType].join('-');
   }
 
-  public getNetworker(dcId: DcId, options: InvokeApiOptions = {}): Promise<MTPNetworker> {
+  public async getNetworker(dcId: DcId, options: InvokeApiOptions = {}): Promise<MTPNetworker> {
     const connectionType: ConnectionType = options.fileDownload ? 'download' : (options.fileUpload ? 'upload' : 'client');
     // const connectionType: ConnectionType = 'client';
 
@@ -379,7 +418,11 @@ export class ApiManager extends ApiManagerMethods {
       return Promise.resolve(networker);
     }
 
-    let getKey = this.generateNetworkerGetKey(dcId, transportType, connectionType);
+    const state = await this.appStateManager.getState();
+    const currentAuth = options.forceAccount || ((state?.authState._ === "authStateSignedIn" &&
+      await sessionStorage.get("user_auth")) ?? "anonymous");
+
+    let getKey = this.generateNetworkerGetKey(dcId, currentAuth, transportType, connectionType);
     if(this.gettingNetworkers[getKey]) {
       return this.gettingNetworkers[getKey];
     }
@@ -389,7 +432,11 @@ export class ApiManager extends ApiManagerMethods {
 
     let transport = this.chooseServer(dcId, connectionType, transportType);
     return this.gettingNetworkers[getKey] = Promise.all([ak, ss].map((key) => sessionStorage.get(key)))
-    .then(async([authKeyHex, serverSaltHex]) => {
+    .then(async([authKeysHex, serverSaltsHex]) => {
+      authKeysHex ??= {};
+      serverSaltsHex ??= {};
+      let [authKeyHex, serverSaltHex] = [authKeysHex[currentAuth], serverSaltsHex[currentAuth]];
+
       let networker: MTPNetworker, error: any;
       if(authKeyHex?.length === 512) {
         if(serverSaltHex?.length !== 16) {
@@ -402,6 +449,11 @@ export class ApiManager extends ApiManagerMethods {
 
         networker = this.networkerFactory.getNetworker(dcId, authKey, authKeyId, serverSalt, options);
       } else {
+        if(currentAuth !== "anonymous") {
+          console.log(currentAuth, dcId)
+          // this.logOut();
+        }
+
         try { // if no saved state
           const auth = await this.authorizer.auth(dcId);
 
@@ -415,8 +467,8 @@ export class ApiManager extends ApiManagerMethods {
           }
 
           sessionStorage.set({
-            [ak]: authKeyHex,
-            [ss]: serverSaltHex
+            [ak]: {...authKeysHex, anonymous: authKeyHex},
+            [ss]: {...serverSaltsHex, anonymous: serverSaltHex}
           });
 
           networker = this.networkerFactory.getNetworker(dcId, auth.authKey, auth.authKeyId, auth.serverSalt, options);
@@ -428,7 +480,7 @@ export class ApiManager extends ApiManagerMethods {
       // ! cannot get it before this promise because simultaneous changeTransport will change nothing
       const newTransportType = this.getTransportType(connectionType);
       if(newTransportType !== transportType) {
-        getKey = this.generateNetworkerGetKey(dcId, newTransportType, connectionType);
+        getKey = this.generateNetworkerGetKey(dcId, currentAuth, newTransportType, connectionType);
         transport.destroy();
         DcConfigurator.removeTransport(this.dcConfigurator.chosenServers, transport);
 

@@ -9,21 +9,24 @@ import type {UserAuth} from './mtproto/mtproto_config';
 import type {DcId} from '../types';
 import {MOUNT_CLASS_TO} from '../config/debug';
 import LocalStorageController from './localStorage';
+import {DcAuthKey, DcServerSalt} from "../types";
 
-const sessionStorage = new LocalStorageController<{
+type AuthValue = Partial<Record<PeerId | "anonymous", string>>;
+
+type AuthKeys = {
+  [key in DcAuthKey]: AuthValue;
+}
+
+type ServerSalts = {
+  [key in DcServerSalt]: AuthValue;
+}
+
+const sessionStorage = new LocalStorageController<AuthKeys & ServerSalts & {
   dc: DcId,
-  user_auth: UserAuth,
+  accounts: Record<PeerId, UserAuth>,
+  // user_auth: UserAuth,
+  user_auth: PeerId,
   state_id: number,
-  dc1_auth_key: string,
-  dc2_auth_key: string,
-  dc3_auth_key: string,
-  dc4_auth_key: string,
-  dc5_auth_key: string,
-  dc1_server_salt: string,
-  dc2_server_salt: string,
-  dc3_server_salt: string,
-  dc4_server_salt: string,
-  dc5_server_salt: string,
   auth_key_fingerprint: string, // = dc${App.baseDcId}_auth_key.slice(0, 8)
   server_time_offset: number,
   xt_instance: AppInstance,

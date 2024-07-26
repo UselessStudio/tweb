@@ -18,6 +18,13 @@ const a: {[type in ApiLimitType]?: {
   descriptionLocked: LangPackKey,
   icon: Icon
 }} = {
+  accounts: {
+    title: 'LimitReached',
+    description: 'LimitReachedAccounts',
+    descriptionPremium: 'LimitReachedAccountsPremium',
+    descriptionLocked: 'LimitReachedAccountsPremium',
+    icon: 'user'
+  },
   pin: {
     title: 'LimitReached',
     description: 'LimitReachedPinDialogs',
@@ -60,7 +67,8 @@ class P extends PopupPeer {
     isPremium: boolean,
     limit: number,
     limitPremium: number,
-    feature?: PremiumPromoFeatureType
+    feature?: PremiumPromoFeatureType,
+    addOne?: boolean,
   }, _a: typeof a[keyof typeof a]) {
     super('popup-limit', {
       buttons: options.isPremium === undefined ? [{
@@ -74,7 +82,7 @@ class P extends PopupPeer {
         callback: () => {
           PopupPremium.show({feature: options.feature});
         },
-        iconRight: 'premium_double'
+        iconRight: options.addOne ? 'premium_addone' : 'premium_double',
       }, {
         langKey: 'Cancel',
         isCancel: true
@@ -128,6 +136,7 @@ export default async function showLimitPopup(type: keyof typeof a) {
     limit,
     limitPremium,
     // feature: featureMap[type]
-    feature
+    feature,
+    addOne: type === "accounts",
   }, _a).show();
 }

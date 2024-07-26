@@ -31,6 +31,7 @@ import callbackify from '../../helpers/callbackify';
 import {NULL_PEER_ID, TEST_NO_STORIES} from '../mtproto/mtproto_config';
 import MTProtoMessagePort from '../mtproto/mtprotoMessagePort';
 import pause from '../../helpers/schedulers/pause';
+import rootScope from "../rootScope.js";
 
 export type User = MTUser.user;
 export type TopPeerType = 'correspondents' | 'bots_inline';
@@ -248,7 +249,7 @@ export class AppUsersManager extends AppManager {
   }
 
   public get userId() {
-    return this.rootScope.myId.toUserId();
+    return rootScope.myId.toUserId();
   }
 
   private onContactsModified(fromServer?: boolean) {

@@ -26,6 +26,8 @@ import filterAsync from "../helpers/array/filterAsync.js";
 type ButtonMenuItemInner = Omit<Parameters<typeof ButtonMenuSync>[0], 'listenerSetter' | 'buttons'> & {buttons: ButtonMenuItemOptionsVerifiable[]};
 export type ButtonMenuItemOptions = {
   icon?: Icon,
+  iconElement?: HTMLElement,
+  rightElement?: HTMLElement,
   iconDoc?: Document.document,
   danger?: boolean,
   new?: boolean,
@@ -59,7 +61,7 @@ export type ButtonMenuItemOptionsVerifiable = ButtonMenuItemOptions & {
 function ButtonMenuItem(options: ButtonMenuItemOptions) {
   if(options.element) return [options.separator as HTMLElement, options.element].filter(Boolean);
 
-  const {icon, iconDoc, className, text, onClick, checkboxField, noCheckboxClickListener} = options;
+  const {icon, iconDoc, className, text, onClick, checkboxField, noCheckboxClickListener, iconElement, rightElement} = options;
   const el = document.createElement('div');
   const iconSplitted = icon?.split(' ');
   el.className = 'btn-menu-item rp-overflow' +
@@ -98,6 +100,11 @@ function ButtonMenuItem(options: ButtonMenuItemOptions) {
       textColor: () => isMobile() ? 'secondary-text-color' : 'primary-text-color',
       strokeWidth: () => isMobile() ? .625 : .375
     });
+  }
+
+  if(iconElement) {
+    iconElement.classList.add('btn-menu-item-icon', 'is-external');
+    el.append(iconElement);
   }
 
   textElement.classList.add('btn-menu-item-text');
@@ -161,6 +168,11 @@ function ButtonMenuItem(options: ButtonMenuItemOptions) {
 
   if(options.multiline) {
     el.classList.add('is-multiline');
+  }
+
+  if(rightElement) {
+    rightElement.classList.add('btn-menu-item-icon-right');
+    el.append(rightElement);
   }
 
   if(options.inner) {

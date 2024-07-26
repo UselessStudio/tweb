@@ -9,6 +9,12 @@
   overflow: hidden;
   background: var(--surface-color);
 
+  .return-button {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+  }
+
   .btn-primary {
     text-transform: uppercase;
 

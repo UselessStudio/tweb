@@ -66,7 +66,7 @@ const onFirstMount = async() => {
     cachedPromise = null;
   }, {once: true});
 
-  const options: {dcId?: DcId, ignoreErrors: true} = {ignoreErrors: true};
+  const options: {dcId?: DcId, ignoreErrors: true, forceAnonymous: true} = {ignoreErrors: true, forceAnonymous: true};
   let prevToken: Uint8Array | number[];
 
   const iterate = async(isLoop: boolean) => {
@@ -75,7 +75,8 @@ const onFirstMount = async() => {
         api_id: App.id,
         api_hash: App.hash,
         except_ids: []
-      }, {ignoreErrors: true});
+      }, {ignoreErrors: true, forceAccount: "anonymous"});
+      // console.log("token", loginToken);
 
       if(loginToken._ === 'auth.loginTokenMigrateTo') {
         if(!options.dcId) {

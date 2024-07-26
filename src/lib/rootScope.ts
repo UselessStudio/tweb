@@ -218,6 +218,7 @@ export class RootScope extends EventListenerBase<BroadcastEventsListeners> {
     this.premium = false;
 
     this.addEventListener('user_auth', ({id}) => {
+      // rootScope.myId = id.toPeerId();
       this.myId = id.toPeerId();
     });
 

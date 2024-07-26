@@ -47,6 +47,7 @@ async function loadStateInner() {
   const promises = ALL_KEYS.map((key) => recordPromise(stateStorage.get(key), 'state ' + key))
   .concat(
     recordPromise(sessionStorage.get('user_auth'), 'auth'),
+    recordPromise(sessionStorage.get('accounts'), 'auth'),
     recordPromise(sessionStorage.get('state_id'), 'auth'),
     recordPromise(sessionStorage.get('k_build'), 'auth'),
     recordPromise(sessionStorage.get('auth_key_fingerprint'), 'auth'),
@@ -126,30 +127,39 @@ async function loadStateInner() {
   arr.splice(0, ALL_KEYS.length);
 
   // * Read auth
-  let auth = arr.shift() as UserAuth | number;
+  let accountId = arr.shift() as number;
+  const accounts = arr.shift() as Record<number, UserAuth>;
   const stateId = arr.shift() as number;
   const sessionBuild = arr.shift() as number;
   const authKeyFingerprint = arr.shift() as string;
-  const baseDcAuthKey = arr.shift() as string;
+  const baseDcAuthKeys = arr.shift() as Record<number, string>;
   const shiftedWebKAuth = arr.shift() as UserAuth | number;
-  if(!auth && shiftedWebKAuth) { // support old webk auth
-    auth = shiftedWebKAuth;
-    const keys: string[] = ['dc', 'server_time_offset', 'xt_instance'];
-    for(let i = 1; i <= 5; ++i) {
-      keys.push(`dc${i}_server_salt`);
-      keys.push(`dc${i}_auth_key`);
-    }
+  // if(!auth && shiftedWebKAuth) { // support old webk auth
+  //   auth = shiftedWebKAuth;
+  //   const keys: string[] = ['dc', 'server_time_offset', 'xt_instance'];
+  //   for(let i = 1; i <= 5; ++i) {
+  //     keys.push(`dc${i}_server_salt`);
+  //     keys.push(`dc${i}_auth_key`);
+  //   }
+  //
+  //   const values = await Promise.all(keys.map((key) => stateStorage.get(key as any)));
+  //   keys.push('user_auth');
+  //   values.push(typeof(auth) === 'number' || typeof(auth) === 'string' ? {dcID: values[0] || App.baseDcId, date: Date.now() / 1000 | 0, id: auth.toPeerId(false)} as UserAuth : auth);
+  //
+  //   const obj: any = {};
+  //   keys.forEach((key, idx) => {
+  //     obj[key] = values[idx];
+  //   });
+  //
+  //   await sessionStorage.set(obj);
+  // }
 
-    const values = await Promise.all(keys.map((key) => stateStorage.get(key as any)));
-    keys.push('user_auth');
-    values.push(typeof(auth) === 'number' || typeof(auth) === 'string' ? {dcID: values[0] || App.baseDcId, date: Date.now() / 1000 | 0, id: auth.toPeerId(false)} as UserAuth : auth);
-
-    const obj: any = {};
-    keys.forEach((key, idx) => {
-      obj[key] = values[idx];
-    });
-
-    await sessionStorage.set(obj);
+  if(!accountId && accounts && Object.values(accounts).length > 0) {
+    accountId = Object.values(accounts)[0].id;
+  }
+  let auth: UserAuth;
+  if(accountId) {
+    auth = accounts[accountId];
   }
 
   /* if(!auth) { // try to read Webogram's session from localStorage
@@ -176,12 +186,15 @@ async function loadStateInner() {
     }
   } */
 
-  if(auth) {
+  if(auth && state.authState._ !== "authStateAddAccount") {
     // ! Warning ! DON'T delete this
+    await sessionStorage.set({
+      dc: +auth.dcID
+    });
     state.authState = {_: 'authStateSignedIn'};
-    rootScope.dispatchEvent('user_auth', typeof(auth) === 'number' || typeof(auth) === 'string' ?
-      {dcID: 0, date: Date.now() / 1000 | 0, id: auth.toPeerId(false)} :
-      auth); // * support old version
+    rootScope.dispatchEvent('user_auth', auth); // * support old version
+  } else {
+    state.authState = STATE_INIT['authState'];
   }
 
   const resetStorages: Set<keyof StoragesResults> = new Set();
@@ -198,7 +211,7 @@ async function loadStateInner() {
       state[key] = value;
     });
 
-    const r: (keyof StoragesResults)[] = ['chats', 'dialogs', 'users'];
+    const r: (keyof StoragesResults)[] = ['chats', 'dialogs']//, 'users'];
     for(const key of r) {
       resetStorages.add(key);
       // this.storagesResults[key as keyof AppStateManager['storagesResults']].length = 0;
@@ -209,7 +222,7 @@ async function loadStateInner() {
 
   if(state.stateId !== stateId) {
     if(stateId !== undefined) {
-      resetState([]);
+      resetState(['settings']);
     }
 
     await sessionStorage.set({
@@ -217,13 +230,14 @@ async function loadStateInner() {
     });
   }
 
-  if(baseDcAuthKey) {
-    const _authKeyFingerprint = baseDcAuthKey.slice(0, 8);
-    if(!authKeyFingerprint) { // * migration, preserve settings
-      resetState(['settings']);
-    } else if(authKeyFingerprint !== _authKeyFingerprint) {
-      resetState([]);
-    }
+  if(state.authState._ === "authStateAddAccount") {
+    resetState(['settings']);
+  }
+
+  if(baseDcAuthKeys?.[auth?.id]) {
+    const _authKeyFingerprint = baseDcAuthKeys[auth.id].slice(0, 8);
+
+    resetState(['settings']);
 
     if(authKeyFingerprint !== _authKeyFingerprint) {
       await sessionStorage.set({

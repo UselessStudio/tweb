@@ -647,6 +647,7 @@ $time-margin-left: math.div($message-padding-horizontal, -2) + 1px;
 
 	&:not(.active):not(:last-child) {
 		filter: brightness(.8);
+    z-index: -1;
 	}
 
 	@include respond-to(no-floating-left-sidebar) {

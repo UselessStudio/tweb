@@ -13,6 +13,6 @@ export default function toggleStorages(enabled: boolean, clearWrite: boolean) {
   return Promise.all([
     AppStorage.toggleStorage(enabled, clearWrite),
     CacheStorageController.toggleStorage(enabled, clearWrite),
-    sessionStorage.toggleStorage(enabled, clearWrite)
+    // sessionStorage.toggleStorage(enabled, clearWrite)
   ]).then(noop, noop);
 }

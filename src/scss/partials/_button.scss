@@ -337,6 +337,24 @@ $btn-menu-z-index: 4;
       transform: scale(.96);
     }
 
+    & .avatar {
+      position: relative;
+      & .selected-tick {
+        position: absolute;
+        content: " ";
+        display: block;
+        border-radius: 50%;
+        border: 2px solid var(--surface-color);
+        background-color: var(--avatar-online-color);
+        //width: 14px;
+        //height: 14px;
+        right: -0.3rem;
+        bottom: -0.2rem;
+        padding: 1px;
+        font-size: 10px;
+      }
+    }
+
     // background-blend-mode: overlay, normal;
     // @include hover() {
     //   background: linear-gradient(0deg, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2)), rgba(0, 0, 0, 0.05);
@@ -559,9 +577,14 @@ $btn-menu-z-index: 4;
     opacity: .6;
   }
 
-  html:not(.is-mobile) & .badge {
+  html:not(.is-mobile) & .badge :not(.message-count) {
     background-color: transparent;
     color: var(--secondary-text-color);
+  }
+
+  & .message-count {
+    background-color: var(--chatlist-status-color);
+    color: var(--badge-text-color);
   }
 
   &-reactions {

@@ -132,6 +132,7 @@ export default class MTPNetworker {
   public isFileNetworker: boolean;
   private isFileUpload: boolean;
   private isFileDownload: boolean;
+  private forceAccount?: PeerId | "anonymous";
 
   private lastServerMessages: Set<MTLong> = new Set();
 
@@ -217,6 +218,7 @@ export default class MTPNetworker {
     this.isFileUpload = !!options.fileUpload;
     this.isFileDownload = !!options.fileDownload;
     this.isFileNetworker = this.isFileUpload || this.isFileDownload;
+    this.forceAccount = options.forceAccount;
     this.delays = this.isFileNetworker ? delays.file : delays.client;
 
     const suffix = this.isFileUpload ? '-U' : this.isFileDownload ? '-D' : '';
@@ -1523,9 +1525,13 @@ export default class MTPNetworker {
   private applyServerSalt(newServerSalt: string) {
     const serverSalt = longToBytes(newServerSalt);
 
-    sessionStorage.set({
-      ['dc' + this.dcId + '_server_salt']: bytesToHex(serverSalt)
-    });
+    const ss = 'dc' + this.dcId + '_server_salt' as any;
+    Promise.all(["user_auth" as any, ss].map((key) => sessionStorage.get(key))).then(([currentAuth, serverSalts]) => {
+      sessionStorage.set({
+        [ss]: {...serverSalts, [this.forceAccount || (currentAuth ?? "anonymous")]: bytesToHex(serverSalt)}
+      });
+    })
+
 
     this.serverSalt = new Uint8Array(serverSalt);
   }

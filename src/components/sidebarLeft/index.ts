@@ -73,6 +73,12 @@ import wrapEmojiStatus from '../wrappers/emojiStatus';
 import {makeMediaSize} from '../../helpers/mediaSize';
 import ReactionElement from '../chat/reaction';
 import setBlankToAnchor from '../../lib/richTextProcessor/setBlankToAnchor';
+import {AvatarNew, avatarNew} from "../avatarNew.js";
+import createMessageCountBadge from "../../lib/appManagers/utils/dialogs/createMessageCountBadge.js";
+import pageSignIn from "../../pages/pageSignIn.js";
+import pageSignQR from "../../pages/pageSignQR.js";
+import appRuntimeManager from "../../lib/appManagers/appRuntimeManager.js";
+import showLimitPopup from "../popups/limit.js";
 
 export const LEFT_COLUMN_ACTIVE_CLASSNAME = 'is-left-column-shown';
 
@@ -157,6 +163,21 @@ export class AppSidebarLeft extends SidebarSlider {
     });
 
     const menuButtons: (ButtonMenuItemOptions & {verify?: () => boolean | Promise<boolean>})[] = [{
+      icon: 'plus',
+      text: 'AddAccount',
+      separator: true,
+      separatorDown: true,
+      onClick: async () => {
+        const limit = await rootScope.managers.apiManager.getLimit("accounts", rootScope.premium);
+        const accounts = Object.keys(await sessionStorage.get("accounts"));
+        if (accounts.length >= limit) {
+          showLimitPopup('accounts');
+          return;
+        }
+        rootScope.managers.appStateManager.pushToState("authState", {_: 'authStateAddAccount'});
+        appRuntimeManager.reload();
+      }
+    }, {
       icon: 'savedmessages',
       text: 'SavedMessages',
       onClick: () => {
@@ -308,7 +329,37 @@ export class AppSidebarLeft extends SidebarSlider {
           return button;
         });
 
-        buttons.splice(3 + (btnArchive.verify() ? 1 : 0), 0, ...attachMenuBotsButtons);
+        const accounts = Object.keys(await sessionStorage.get("accounts") ?? {});
+
+        for (const account of accounts) {
+          const user = await this.managers.appUsersManager.getUser(account);
+
+          const avatar = AvatarNew({
+            size: 24,
+            peerId: account.toPeerId(),
+          });
+
+          if(user.id === rootScope.myId) {
+            const icon = Icon('check');
+            icon.classList.add("selected-tick");
+            avatar.node.appendChild(icon);
+          }
+
+          buttons.unshift({
+            regularText: `${user?.first_name} ${user?.last_name ?? ""}`,
+            // regularText: account,
+            rightElement: createMessageCountBadge(1488),
+            iconElement: avatar.node,
+            onClick: () => {
+              sessionStorage.set({
+                user_auth: account.toPeerId()
+              });
+              appRuntimeManager.reload();
+            },
+          });
+        }
+
+        buttons.splice(4 + (btnArchive.verify() ? 1 : 0) + accounts.length, 0, ...attachMenuBotsButtons);
         filteredButtons.splice(0, filteredButtons.length, ...buttons);
       },
       onOpen: (e, btnMenu) => {

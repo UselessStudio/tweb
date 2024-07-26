@@ -35,7 +35,7 @@ import ctx from '../../environment/ctx';
 import PeersStorage from '../storages/peers';
 import ThumbsStorage from '../storages/thumbs';
 import {NetworkerFactory} from '../mtproto/networkerFactory';
-import {RootScope} from '../rootScope';
+import rootScope, {RootScope} from '../rootScope';
 import {Authorizer} from '../mtproto/authorizer';
 import {DcConfigurator} from '../mtproto/dcConfigurator';
 import {TimeManager} from '../mtproto/timeManager';
@@ -91,7 +91,7 @@ export default function createManagers(appStoragesManager: AppStoragesManager, u
     peersStorage: new PeersStorage,
     thumbsStorage: new ThumbsStorage,
     networkerFactory: new NetworkerFactory,
-    rootScope: new RootScope,
+    rootScope: rootScope,
     authorizer: new Authorizer,
     dcConfigurator: new DcConfigurator,
     timeManager: new TimeManager,
@@ -128,6 +128,10 @@ export default function createManagers(appStoragesManager: AppStoragesManager, u
 
     // @ts-ignore
     ctx[name] = manager;
+  }
+
+  if(userId) {
+    rootScope.myId = userId.toPeerId();
   }
 
   const promises: Array<Promise<(() => void) | void> | void>[] = [];
