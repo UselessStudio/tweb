@@ -157,6 +157,8 @@ export class AppUsersManager extends AppManager {
     ]).then(([state, {results: users, storage}, accounts]) => {
       this.storage = storage;
 
+      if(!accounts) return;
+
       for(const user of users) {
         if(user?.id in accounts && user.id !== rootScope.myId) {
           delete user.pFlags.self;

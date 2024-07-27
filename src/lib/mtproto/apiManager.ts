@@ -302,9 +302,9 @@ export class ApiManager extends ApiManagerMethods {
   }
 
   private async removeAccountFromStorage(account: PeerId | 'anonymous') {
-    const keys: string[] = [];
+    const keys: string[] = ['accounts'];
     for(let i = 1; i <= 5; i++) {
-      keys.push(`dc${i}_server_salt`, `dc${i}_auth_key`, `accounts`)
+      keys.push(`dc${i}_server_salt`, `dc${i}_auth_key`)
     }
 
     await Promise.all(keys.map((key) => sessionStorage.get(key as any))).then((values: (Record<PeerId | 'anonymous', string> | null)[]) => {
@@ -356,7 +356,7 @@ export class ApiManager extends ApiManagerMethods {
     const logoutPromises: Promise<any>[] = [];
     for(let i = 0; i < storageKeys.length; i++) {
       if(keys[i] && user in keys[i]) {
-        logoutPromises.push(this.invokeApi('auth.logOut', {}, {dcId: (i + 1) as DcId, ignoreErrors: true, forceAccount: account}));
+        logoutPromises.push(this.invokeApi('auth.logOut', {}, {dcId: (i + 1) as DcId, ignoreErrors: true, forceAccount: user}));
       }
     }
 
@@ -364,10 +364,16 @@ export class ApiManager extends ApiManagerMethods {
       await this.removeAccountFromStorage(user);
       if(account) return;
       this.baseDcId = undefined;
-      sessionStorage.delete('user_auth');
-      sessionStorage.delete('state_id');
+      await Promise.all([
+        sessionStorage.delete('user_auth'),
+        sessionStorage.delete('state_id')
+      ]);
       // this.telegramMeNotify(false);
-      // await toggleStorages(false, true);
+      await sessionStorage.get('accounts').then(accounts => {
+        if(!accounts || Object.keys(accounts).length < 1) {
+          return toggleStorages(false, true)
+        }
+      })
       IDB.closeDatabases();
       this.rootScope.dispatchEvent('logging_out');
     };
@@ -400,9 +406,7 @@ export class ApiManager extends ApiManagerMethods {
       };
     }
 
-    const state = await this.appStateManager.getState();
-    const currentAuth = options.forceAccount || ((state?.authState._ === 'authStateSignedIn' &&
-      await sessionStorage.get('user_auth')) ?? 'anonymous');
+    const currentAuth = options.forceAccount || rootScope.myId || await sessionStorage.get('user_auth') || 'anonymous';
 
     const cache = this.cachedNetworkers[transportType][connectionType];
     if(!(dcId in cache)) {
