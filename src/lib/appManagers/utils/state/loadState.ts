@@ -51,7 +51,8 @@ async function loadStateInner() {
     recordPromise(sessionStorage.get('state_id'), 'auth'),
     recordPromise(sessionStorage.get('k_build'), 'auth'),
     recordPromise(sessionStorage.get('auth_key_fingerprint'), 'auth'),
-    recordPromise(sessionStorage.get(`dc${App.baseDcId}_auth_key`), 'auth')
+    recordPromise(sessionStorage.get(`dc${App.baseDcId}_auth_key`), 'auth'),
+    recordPromise(sessionStorage.get('user_auth'), 'old auth')
   )
   .concat( // support old webk format
     recordPromise(stateStorage.get('user_auth'), 'old auth')
@@ -128,31 +129,47 @@ async function loadStateInner() {
 
   // * Read auth
   let accountId = arr.shift() as number;
-  const accounts = arr.shift() as Record<number, UserAuth>;
+  let accounts = arr.shift() as Record<number, UserAuth>;
   const stateId = arr.shift() as number;
   const sessionBuild = arr.shift() as number;
   const authKeyFingerprint = arr.shift() as string;
   const baseDcAuthKeys = arr.shift() as Record<number, string>;
+  let oldAuth = arr.shift() as UserAuth;
   const shiftedWebKAuth = arr.shift() as UserAuth | number;
-  // if(!auth && shiftedWebKAuth) { // support old webk auth
-  //   auth = shiftedWebKAuth;
-  //   const keys: string[] = ['dc', 'server_time_offset', 'xt_instance'];
-  //   for(let i = 1; i <= 5; ++i) {
-  //     keys.push(`dc${i}_server_salt`);
-  //     keys.push(`dc${i}_auth_key`);
-  //   }
-  //
-  //   const values = await Promise.all(keys.map((key) => stateStorage.get(key as any)));
-  //   keys.push('user_auth');
-  //   values.push(typeof(auth) === 'number' || typeof(auth) === 'string' ? {dcID: values[0] || App.baseDcId, date: Date.now() / 1000 | 0, id: auth.toPeerId(false)} as UserAuth : auth);
-  //
-  //   const obj: any = {};
-  //   keys.forEach((key, idx) => {
-  //     obj[key] = values[idx];
-  //   });
-  //
-  //   await sessionStorage.set(obj);
-  // }
+
+  if(!accountId && shiftedWebKAuth) { // support old webk auth
+    const auth = shiftedWebKAuth;
+    const keys: string[] = ['dc', 'server_time_offset', 'xt_instance'];
+    for(let i = 1; i <= 5; ++i) {
+      keys.push(`dc${i}_server_salt`);
+      keys.push(`dc${i}_auth_key`);
+    }
+
+    const values = await Promise.all(keys.map((key) => stateStorage.get(key as any)));
+    keys.push('user_auth');
+    values.push(typeof(auth) === 'number' || typeof(auth) === 'string' ? {dcID: values[0] || App.baseDcId, date: Date.now() / 1000 | 0, id: auth.toPeerId(false)} as UserAuth : auth);
+
+    const obj: any = {};
+    keys.forEach((key, idx) => {
+      obj[key] = values[idx];
+    });
+
+    await sessionStorage.set(obj);
+    oldAuth = obj['user_auth']
+  }
+
+  if(typeof oldAuth?.id === 'number') {
+    accounts = {[oldAuth.id]: oldAuth}
+    const dc = oldAuth.dcID;
+    accountId = oldAuth.id;
+    const [ak, ss] = [`dc${dc}_auth_key`, `dc${dc}_server_salt`]
+    const [akVal, ssVal] = await Promise.all([ak, ss].map(k => sessionStorage.get(k as any)));
+    await sessionStorage.set({
+      [ak]: {[accountId]: akVal},
+      [ss]: {[accountId]: ssVal},
+      accounts
+    });
+  }
 
   if(!accountId && accounts && Object.values(accounts).length > 0) {
     accountId = Object.values(accounts)[0].id;
