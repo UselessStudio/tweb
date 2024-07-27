@@ -20,13 +20,14 @@ import {IS_WEB_WORKER} from '../../helpers/context';
 import {DcId} from '../../types';
 import {getEnvironment} from '../../environment/utils';
 import SocketProxied from './transports/socketProxied';
+import MTPNetworker from './networker';
 
 export type TransportType = 'websocket' | 'https' | 'http';
 export type ConnectionType = 'client' | 'download' | 'upload';
 type Servers = {
   [transportType in TransportType]: {
     [connectionType in ConnectionType]: {
-      [dcId: DcId]: MTTransport[]
+      [dcId: DcId]: Partial<Record<PeerId | 'anonymous', MTTransport[]>>
     }
   }
 };
@@ -117,6 +118,7 @@ export class DcConfigurator {
 
   public chooseServer(
     dcId: DcId,
+    currentAuth: PeerId | 'anonymous',
     connectionType: ConnectionType = 'client',
     transportType: TransportType = Modes.transport,
     reuse = true,
@@ -137,10 +139,14 @@ export class DcConfigurator {
     const servers = this.chosenServers[transportType][connectionType];
 
     if(!(dcId in servers)) {
-      servers[dcId] = [];
+      servers[dcId] = {};
     }
 
-    const transports = servers[dcId];
+    if(!(currentAuth in servers[dcId])) {
+      servers[dcId][currentAuth] = [];
+    }
+
+    const transports = servers[dcId][currentAuth];
 
     if(!transports.length || !reuse/*  || (upload && transports.length < 1) */) {
       let transport: MTTransport;
@@ -175,8 +181,10 @@ export class DcConfigurator {
         // @ts-ignore
         for(const dcId in obj[transportType][connectionType]) {
           // @ts-ignore
-          const transports: T[] = obj[transportType][connectionType][dcId];
-          indexOfAndSplice(transports, transport);
+          for(const account in obj[transportType][connectionType][dcId]) {
+            const transports: T[] = obj[transportType][connectionType][dcId][account];
+            indexOfAndSplice(transports, transport);
+          }
         }
       }
     }

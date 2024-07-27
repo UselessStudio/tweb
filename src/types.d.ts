@@ -8,7 +8,7 @@ export type DcServerSalt = `dc${TrueDcId}_server_salt`;
 
 export type InvokeApiOptions = Partial<{
   dcId: DcId,
-  forceAccount: PeerId | "anonymous",
+  forceAccount: PeerId | 'anonymous',
   floodMaxTimeout: number,
   noErrorBox: true,
   fileUpload: true,

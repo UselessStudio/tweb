@@ -83,7 +83,8 @@ export type NotificationBuildTaskPayload = {
   message: Message.message | Message.messageService,
   fwdCount?: number,
   peerReaction?: MessagePeerReaction,
-  peerTypeNotifySettings?: PeerNotifySettings
+  peerTypeNotifySettings?: PeerNotifySettings,
+  toAccount?: PeerId
 };
 
 export type TabState = {

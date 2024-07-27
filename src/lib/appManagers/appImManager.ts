@@ -213,6 +213,7 @@ export class AppImManager extends EventListenerBase<{
       apiUpdatesManager
     } = managers;
     apiUpdatesManager.attach(I18n.lastRequestedLangCode);
+    this.managers.appAccountsManager.attach();
 
     appMediaPlaybackController.construct(managers);
     uiNotificationsManager.construct(managers);
@@ -575,10 +576,10 @@ export class AppImManager extends EventListenerBase<{
     });
 
     apiManagerProxy.addEventListener('notificationBuild', async(options) => {
-      console.log("notify", options);
+      console.log('notify', options);
       const isForum = await this.managers.appPeersManager.isForum(options.message.peerId);
       const threadId = getMessageThreadId(options.message, isForum);
-      if(this.chat.peerId === options.message.peerId && this.chat.threadId === threadId && !idleController.isIdle) {
+      if(this.chat.peerId === options.message.peerId && this.chat.threadId === threadId && !idleController.isIdle && !options.toAccount) {
         return;
       }
 

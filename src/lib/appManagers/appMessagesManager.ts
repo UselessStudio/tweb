@@ -3184,7 +3184,7 @@ export class AppMessagesManager extends AppManager {
     return storage?.delete(mid);
   }
 
-  private createMessageStorage(peerId: PeerId, type: MessagesStorageType) {
+  createMessageStorage(peerId: PeerId, type: MessagesStorageType) {
     const storage: MessagesStorage = new Map() as any;
     storage.peerId = peerId;
     storage.type = type;
@@ -6723,7 +6723,7 @@ export class AppMessagesManager extends AppManager {
     }
   }
 
-  private getThreadKey(threadMessage: MyMessage) {
+  getThreadKey(threadMessage: MyMessage) {
     let threadKey = '';
     const peerId = threadMessage?.peerId;
     if(!peerId) {
@@ -7099,10 +7099,11 @@ export class AppMessagesManager extends AppManager {
     });
   }
 
-  private notifyAboutMessage(message: MyMessage, options: Partial<{
+  notifyAboutMessage(message: MyMessage, options: Partial<{
     fwdCount: number,
     peerReaction: MessagePeerReaction,
-    peerTypeNotifySettings: PeerNotifySettings
+    peerTypeNotifySettings: PeerNotifySettings,
+    toAccount?: PeerId
   }> = {}) {
     const peerId = this.getMessagePeer(message);
 

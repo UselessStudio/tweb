@@ -31,7 +31,8 @@ import callbackify from '../../helpers/callbackify';
 import {NULL_PEER_ID, TEST_NO_STORIES} from '../mtproto/mtproto_config';
 import MTProtoMessagePort from '../mtproto/mtprotoMessagePort';
 import pause from '../../helpers/schedulers/pause';
-import rootScope from "../rootScope.js";
+import rootScope from '../rootScope.js';
+import sessionStorage from '../sessionStorage';
 
 export type User = MTUser.user;
 export type TopPeerType = 'correspondents' | 'bots_inline';
@@ -151,9 +152,16 @@ export class AppUsersManager extends AppManager {
 
     return Promise.all([
       this.appStateManager.getState(),
-      this.appStoragesManager.loadStorage('users')
-    ]).then(([state, {results: users, storage}]) => {
+      this.appStoragesManager.loadStorage('users'),
+      sessionStorage.get('accounts')
+    ]).then(([state, {results: users, storage}, accounts]) => {
       this.storage = storage;
+
+      for(const user of users) {
+        if(user?.id in accounts && user.id !== rootScope.myId) {
+          delete user.pFlags.self;
+        }
+      }
 
       this.saveApiUsers(users);
       for(let i = 0, length = users.length; i < length; ++i) {
@@ -559,6 +567,10 @@ export class AppUsersManager extends AppManager {
     // }
 
     user.pFlags ??= {};
+
+    if((!user.pFlags.self && userId === rootScope.myId) || (user.pFlags.self && userId !== rootScope.myId)) {
+      return;
+    }
 
     if(user.pFlags.min && oldUser !== undefined) {
       return;

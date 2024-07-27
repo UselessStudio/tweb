@@ -73,12 +73,12 @@ import wrapEmojiStatus from '../wrappers/emojiStatus';
 import {makeMediaSize} from '../../helpers/mediaSize';
 import ReactionElement from '../chat/reaction';
 import setBlankToAnchor from '../../lib/richTextProcessor/setBlankToAnchor';
-import {AvatarNew, avatarNew} from "../avatarNew.js";
-import createMessageCountBadge from "../../lib/appManagers/utils/dialogs/createMessageCountBadge.js";
-import pageSignIn from "../../pages/pageSignIn.js";
-import pageSignQR from "../../pages/pageSignQR.js";
-import appRuntimeManager from "../../lib/appManagers/appRuntimeManager.js";
-import showLimitPopup from "../popups/limit.js";
+import {AvatarNew} from '../avatarNew.js';
+import createMessageCountBadge from '../../lib/appManagers/utils/dialogs/createMessageCountBadge.js';
+import appRuntimeManager from '../../lib/appManagers/appRuntimeManager.js';
+import showLimitPopup from '../popups/limit.js';
+import {GLOBAL_FOLDER_ID} from '../../lib/storages/dialogs';
+import {AppAccountsManager} from '../../lib/appManagers/appAccountsManager';
 
 export const LEFT_COLUMN_ACTIVE_CLASSNAME = 'is-left-column-shown';
 
@@ -167,14 +167,14 @@ export class AppSidebarLeft extends SidebarSlider {
       text: 'AddAccount',
       separator: true,
       separatorDown: true,
-      onClick: async () => {
-        const limit = await rootScope.managers.apiManager.getLimit("accounts", rootScope.premium);
-        const accounts = Object.keys(await sessionStorage.get("accounts"));
-        if (accounts.length >= limit) {
+      onClick: async() => {
+        const limit = await rootScope.managers.apiManager.getLimit('accounts', rootScope.premium);
+        const accounts = Object.keys(await sessionStorage.get('accounts'));
+        if(accounts.length >= limit) {
           showLimitPopup('accounts');
           return;
         }
-        rootScope.managers.appStateManager.pushToState("authState", {_: 'authStateAddAccount'});
+        rootScope.managers.appStateManager.pushToState('authState', {_: 'authStateAddAccount'});
         appRuntimeManager.reload();
       }
     }, {
@@ -294,9 +294,9 @@ export class AppSidebarLeft extends SidebarSlider {
             const installPrompt = getInstallPrompt();
             installPrompt?.();
           },
-          verify: () => !!getInstallPrompt(),
+          verify: () => !!getInstallPrompt()
         }]
-      },
+      }
     }];
 
     const filteredButtons = menuButtons.filter(Boolean);
@@ -329,33 +329,37 @@ export class AppSidebarLeft extends SidebarSlider {
           return button;
         });
 
-        const accounts = Object.keys(await sessionStorage.get("accounts") ?? {});
+        const accounts = Object.keys(await sessionStorage.get('accounts') ?? {});
 
-        for (const account of accounts) {
+        for(const account of accounts) {
           const user = await this.managers.appUsersManager.getUser(account);
 
           const avatar = AvatarNew({
             size: 24,
-            peerId: account.toPeerId(),
+            peerId: account.toPeerId()
           });
 
-          if(user.id === rootScope.myId) {
+          let unread: number;
+          if(user?.id === rootScope.myId) {
+            unread = AppAccountsManager.countUnreadDialogs((await this.managers.dialogsStorage.getDialogs({})).dialogs);
             const icon = Icon('check');
-            icon.classList.add("selected-tick");
+            icon.classList.add('selected-tick');
             avatar.node.appendChild(icon);
+          } else {
+            unread = await this.managers.appAccountsManager.getUnread(account.toPeerId());
           }
 
           buttons.unshift({
-            regularText: `${user?.first_name} ${user?.last_name ?? ""}`,
+            regularText: `${user?.first_name} ${user?.last_name ?? ''}`,
             // regularText: account,
-            rightElement: createMessageCountBadge(1488),
+            rightElement: unread > 0 ? createMessageCountBadge(unread) : undefined,
             iconElement: avatar.node,
             onClick: () => {
               sessionStorage.set({
                 user_auth: account.toPeerId()
               });
               appRuntimeManager.reload();
-            },
+            }
           });
         }
 
@@ -375,7 +379,7 @@ export class AppSidebarLeft extends SidebarSlider {
         t.classList.add('btn-menu-footer-text');
         t.textContent = 'Telegram Web' + App.suffix + ' '/* ' alpha ' */ + App.versionFull;
         btnMenuFooter.append(t);
-        const inner = btnMenu.querySelector(".inner");
+        const inner = btnMenu.querySelector('.inner');
         inner.classList.add('has-footer');
         inner.append(btnMenuFooter);
 

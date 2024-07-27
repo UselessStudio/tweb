@@ -9,9 +9,9 @@ import type {UserAuth} from './mtproto/mtproto_config';
 import type {DcId} from '../types';
 import {MOUNT_CLASS_TO} from '../config/debug';
 import LocalStorageController from './localStorage';
-import {DcAuthKey, DcServerSalt} from "../types";
+import {DcAuthKey, DcServerSalt} from '../types';
 
-type AuthValue = Partial<Record<PeerId | "anonymous", string>>;
+type AuthValue = Partial<Record<PeerId | 'anonymous', string>>;
 
 type AuthKeys = {
   [key in DcAuthKey]: AuthValue;

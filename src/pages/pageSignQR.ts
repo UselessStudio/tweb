@@ -75,7 +75,7 @@ const onFirstMount = async() => {
         api_id: App.id,
         api_hash: App.hash,
         except_ids: []
-      }, {ignoreErrors: true, forceAccount: "anonymous"});
+      }, {ignoreErrors: true, forceAccount: 'anonymous'});
       // console.log("token", loginToken);
 
       if(loginToken._ === 'auth.loginTokenMigrateTo') {

@@ -130,7 +130,7 @@ export class Authorizer extends AppManager {
     resultArray.set(headerArray);
     resultArray.set(requestArray, headerArray.length);
 
-    const transport = this.dcConfigurator.chooseServer(dcId, 'client', this.transportType);
+    const transport = this.dcConfigurator.chooseServer(dcId, 'anonymous', 'client', this.transportType);
     const baseError = {
       code: 406,
       type: 'NETWORK_BAD_RESPONSE'

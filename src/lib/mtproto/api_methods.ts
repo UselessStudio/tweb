@@ -80,7 +80,6 @@ export default abstract class ApiManagerMethods extends AppManager {
   abstract setUserAuth(userAuth: UserAuth | UserId): Promise<void>;
 
   public setUser(user: User) {
-
     this.appUsersManager.saveApiUser(user);
     return this.setUserAuth(user.id);
   }
@@ -368,7 +367,7 @@ export default abstract class ApiManagerMethods extends AppManager {
   }
 
   public getLimit(type: ApiLimitType | 'accounts', isPremium?: boolean) {
-    if(type === "accounts") return isPremium ? 4 : 3;
+    if(type === 'accounts') return isPremium ? 4 : 3;
     return callbackify(this.getAppConfig(), (appConfig) => {
       const map: {[type in Exclude<ApiLimitType, 'accounts'>]: [keyof MTAppConfig, keyof MTAppConfig] | keyof MTAppConfig} = {
         pin: ['dialogs_pinned_limit_default', 'dialogs_pinned_limit_premium'],
@@ -387,7 +386,7 @@ export default abstract class ApiManagerMethods extends AppManager {
         folderPeers: ['dialog_filters_chats_limit_default', 'dialog_filters_chats_limit_premium'],
         uploadFileParts: ['upload_max_fileparts_default', 'upload_max_fileparts_premium'],
         recommendedChannels: ['recommended_channels_limit_default', 'recommended_channels_limit_premium'],
-        savedPin: ['saved_dialogs_pinned_limit_default', 'saved_dialogs_pinned_limit_premium'],
+        savedPin: ['saved_dialogs_pinned_limit_default', 'saved_dialogs_pinned_limit_premium']
       };
 
       isPremium ??= this.rootScope.premium;

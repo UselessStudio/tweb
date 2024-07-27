@@ -104,7 +104,8 @@ export type State = {
     themes: AppTheme[],
     theme: AppTheme['name'],
     notifications: {
-      sound: boolean
+      sound: boolean,
+      allAccounts: boolean,
     },
     nightTheme?: boolean, // ! DEPRECATED
     timeFormat: 'h12' | 'h23',
@@ -302,7 +303,8 @@ export const STATE_INIT: State = {
     ],
     theme: 'system',
     notifications: {
-      sound: false
+      sound: false,
+      allAccounts: true
     },
     timeFormat: getTimeFormat(),
     liteMode: {

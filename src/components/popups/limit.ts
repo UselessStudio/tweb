@@ -82,7 +82,7 @@ class P extends PopupPeer {
         callback: () => {
           PopupPremium.show({feature: options.feature});
         },
-        iconRight: options.addOne ? 'premium_addone' : 'premium_double',
+        iconRight: options.addOne ? 'premium_addone' : 'premium_double'
       }, {
         langKey: 'Cancel',
         isCancel: true
@@ -137,6 +137,6 @@ export default async function showLimitPopup(type: keyof typeof a) {
     limitPremium,
     // feature: featureMap[type]
     feature,
-    addOne: type === "accounts",
+    addOne: type === 'accounts'
   }, _a).show();
 }

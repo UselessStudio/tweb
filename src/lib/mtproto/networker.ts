@@ -41,6 +41,8 @@ import pause from '../../helpers/schedulers/pause';
 import {getEnvironment} from '../../environment/utils';
 import {TimeManager} from './timeManager';
 import indexOfAndSplice from '../../helpers/array/indexOfAndSplice';
+import rootScope from '../rootScope';
+import {AppAccountsManager} from '../appManagers/appAccountsManager';
 
 // console.error('networker included!', new Error().stack);
 
@@ -132,7 +134,7 @@ export default class MTPNetworker {
   public isFileNetworker: boolean;
   private isFileUpload: boolean;
   private isFileDownload: boolean;
-  private forceAccount?: PeerId | "anonymous";
+  public forceAccount?: PeerId | 'anonymous';
 
   private lastServerMessages: Set<MTLong> = new Set();
 
@@ -206,6 +208,7 @@ export default class MTPNetworker {
   constructor(
     private networkerFactory: NetworkerFactory,
     private timeManager: TimeManager,
+    private appAccountsManager: AppAccountsManager,
     public dcId: number,
     private authKey: Uint8Array,
     private authKeyId: Uint8Array,
@@ -906,7 +909,7 @@ export default class MTPNetworker {
     this.status = status;
 
     if(willChange) {
-      if(this.networkerFactory.onConnectionStatusChange) {
+      if(this.networkerFactory.onConnectionStatusChange && !this.forceAccount) {
         this.networkerFactory.onConnectionStatusChange({
           _: 'networkerStatus',
           status,
@@ -1526,9 +1529,9 @@ export default class MTPNetworker {
     const serverSalt = longToBytes(newServerSalt);
 
     const ss = 'dc' + this.dcId + '_server_salt' as any;
-    Promise.all(["user_auth" as any, ss].map((key) => sessionStorage.get(key))).then(([currentAuth, serverSalts]) => {
+    sessionStorage.get(ss).then(serverSalts => {
       sessionStorage.set({
-        [ss]: {...serverSalts, [this.forceAccount || (currentAuth ?? "anonymous")]: bytesToHex(serverSalt)}
+        [ss]: {...serverSalts, [this.forceAccount || (rootScope.myId === 0 ? 'anonymous': rootScope.myId)]: bytesToHex(serverSalt)}
       });
     })
 
@@ -1878,7 +1881,7 @@ export default class MTPNetworker {
         this.applyServerSalt(message.server_salt);
 
         sessionStorage.get('dc').then((baseDcId) => {
-          if(baseDcId === this.dcId && !this.isFileNetworker) {
+          if(baseDcId === this.dcId && !this.isFileNetworker && !this.forceAccount) {
             this.networkerFactory.updatesProcessor?.(message);
           }
         });
@@ -2005,6 +2008,11 @@ export default class MTPNetworker {
       default:
         this.ackMessage(messageId);
 
+        if(this.forceAccount) {
+          // rootScope.dispatchEvent('subaccount_update', {account: this.forceAccount as number, message});
+          this.appAccountsManager.handleUpdate(this.forceAccount as PeerId, message);
+          break;
+        }
         /* if(this.debug) {
           this.log.debug('Update', message);
         } */

@@ -35,7 +35,7 @@ import toggleStorages from '../../helpers/toggleStorages';
 import tsNow from '../../helpers/tsNow';
 import transportController from './transports/controller';
 import MTTransport from './transports/transport';
-import rootScope from "../rootScope.js";
+import rootScope from '../rootScope.js';
 
 /* class RotatableArray<T> {
   public array: Array<T> = [];
@@ -55,7 +55,7 @@ export class ApiManager extends ApiManagerMethods {
   private cachedNetworkers: {
     [transportType in TransportType]: {
       [connectionType in ConnectionType]: {
-        [dcId: DcId]: MTPNetworker[]
+        [dcId: DcId]: Partial<Record<PeerId | 'anonymous', MTPNetworker[]>>
       }
     }
   };
@@ -124,8 +124,8 @@ export class ApiManager extends ApiManagerMethods {
     });
 
     this.rootScope.addEventListener('premium_toggle', (isPremium) => {
-      this.iterateNetworkers(({networker, connectionType, dcId, transportType}) => {
-        if(connectionType === 'client' || transportType !== 'websocket') {
+      this.iterateNetworkers(({networker, account, connectionType, dcId, transportType}) => {
+        if(connectionType === 'client' || transportType !== 'websocket' || account !== rootScope.myId) {
           return;
         }
 
@@ -176,30 +176,34 @@ export class ApiManager extends ApiManagerMethods {
     return transportType;
   }
 
-  private iterateNetworkers(callback: (o: {networker: MTPNetworker, dcId: DcId, connectionType: ConnectionType, transportType: TransportType, index: number, array: MTPNetworker[]}) => void) {
+  private iterateNetworkers(callback: (o: {networker: MTPNetworker, account: PeerId | 'anonymous', dcId: DcId, connectionType: ConnectionType, transportType: TransportType, index: number, array: MTPNetworker[]}) => void) {
     for(const transportType in this.cachedNetworkers) {
       const connections = this.cachedNetworkers[transportType as TransportType];
       for(const connectionType in connections) {
         const dcs = connections[connectionType as ConnectionType];
         for(const dcId in dcs) {
-          const networkers = dcs[dcId as any as DcId];
-          networkers.forEach((networker, idx, arr) => {
-            callback({
-              networker,
-              dcId: +dcId as DcId,
-              connectionType: connectionType as ConnectionType,
-              transportType: transportType as TransportType,
-              index: idx,
-              array: arr
+          const dc = dcs[dcId as any as DcId];
+          for(const account in dc) {
+            const networkers = dc[account];
+            networkers.forEach((networker, idx, arr) => {
+              callback({
+                networker,
+                account: account as any,
+                dcId: +dcId as DcId,
+                connectionType: connectionType as ConnectionType,
+                transportType: transportType as TransportType,
+                index: idx,
+                array: arr
+              });
             });
-          });
+          }
         }
       }
     }
   }
 
-  private chooseServer(dcId: DcId, connectionType: ConnectionType, transportType: TransportType) {
-    return this.dcConfigurator.chooseServer(dcId, connectionType, transportType, connectionType === 'client', this.rootScope.premium);
+  private chooseServer(dcId: DcId, account: PeerId | 'anonymous', connectionType: ConnectionType, transportType: TransportType) {
+    return this.dcConfigurator.chooseServer(dcId, account, connectionType, transportType, connectionType === 'client', this.rootScope.premium);
   }
 
   public changeTransportType(transportType: TransportType) {
@@ -229,7 +233,7 @@ export class ApiManager extends ApiManagerMethods {
 
     this.iterateNetworkers((info) => {
       const transportType = this.getTransportType(info.connectionType);
-      const transport = this.chooseServer(info.dcId, info.connectionType, transportType);
+      const transport = this.chooseServer(info.dcId, info.account, info.connectionType, transportType);
       this.changeNetworkerTransport(info.networker, transport);
     });
   }
@@ -252,7 +256,6 @@ export class ApiManager extends ApiManagerMethods {
   }
 
   public async setUserAuth(userAuth: UserAuth | UserId) {
-    console.log("setting auth", userAuth);
     if(typeof(userAuth) === 'string' || typeof(userAuth) === 'number') {
       userAuth = {dcID: 0, date: tsNow(true), id: userAuth.toPeerId(false)};
     }
@@ -264,43 +267,54 @@ export class ApiManager extends ApiManagerMethods {
 
     const ss = 'dc' + userAuth.dcID + '_server_salt' as any;
     const ak = 'dc' + userAuth.dcID + '_auth_key' as any;
-    Promise.all([ss, ak].map((key) => sessionStorage.get(key)))
-      .then(async ([serverSalts, authKeys]) => {
-        const id = (userAuth as UserAuth).id;
-        if(!(id in serverSalts)) {
-          await sessionStorage.set({
-            [ak]: {...authKeys, [id]: authKeys['anonymous']},
-            [ss]: {...serverSalts, [id]: serverSalts['anonymous']}
-          });
+    await Promise.all([ss, ak].map((key) => sessionStorage.get(key)))
+    .then(async([serverSalts, authKeys]) => {
+      const auth = userAuth as UserAuth;
+      if(!(auth.id in serverSalts)) {
+        const baseDcs: any = {};
+        const baseAk = `dc${App.baseDcId}_auth_key`;
+        const baseSs = `dc${App.baseDcId}_server_salt`;
+        if(auth.dcID !== App.baseDcId) {
+          const baseKeys = await sessionStorage.get(baseAk as any);
+          const baseSalts = await sessionStorage.get(baseSs as any);
+          baseDcs[baseAk] = {...baseKeys, [auth.id]: baseKeys['anonymous']};
+          baseDcs[baseSs] = {...baseSalts, [auth.id]: baseSalts['anonymous']};
         }
+        const storage = {
+          ...baseDcs,
+          [ak]: {...authKeys, [auth.id]: authKeys['anonymous']},
+          [ss]: {...serverSalts, [auth.id]: serverSalts['anonymous']}
+        };
+        console.log(storage);
+        await sessionStorage.set(storage);
+      }
     });
 
     await sessionStorage.set({
       user_auth: userAuth.id,
-      accounts: {...(await sessionStorage.get("accounts")), [userAuth.id]: userAuth},
+      accounts: {...(await sessionStorage.get('accounts')), [userAuth.id]: userAuth}
     });
 
-    this.removeAccountFromStorage("anonymous");
+    this.removeAccountFromStorage('anonymous');
 
     this.rootScope.dispatchEvent('user_auth', userAuth);
     // this.telegramMeNotify(true);
   }
 
-  private async removeAccountFromStorage(account: PeerId | "anonymous") {
-    console.log("removing", account);
+  private async removeAccountFromStorage(account: PeerId | 'anonymous') {
     const keys: string[] = [];
-    for (let i = 1; i <= 5; i++) {
+    for(let i = 1; i <= 5; i++) {
       keys.push(`dc${i}_server_salt`, `dc${i}_auth_key`, `accounts`)
     }
 
-    await Promise.all(keys.map((key) => sessionStorage.get(key as any))).then((values: (Record<PeerId | "anonymous", string> | null)[]) => {
-      for (let i = 0; i < values.length; i++) {
+    await Promise.all(keys.map((key) => sessionStorage.get(key as any))).then((values: (Record<PeerId | 'anonymous', string> | null)[]) => {
+      for(let i = 0; i < values.length; i++) {
         if(!values[i]) continue;
         delete values[i][account];
       }
-      console.log("value", values);
+
       return sessionStorage.set(Object.fromEntries(keys.map((k, i) => [k, values[i]])
-        .filter(([_, v]) => v)));
+      .filter(([_, v]) => v)));
     });
   }
 
@@ -319,7 +333,10 @@ export class ApiManager extends ApiManagerMethods {
     });
   }
 
-  public async logOut() {
+  public async logOut(account?: PeerId | 'anonymous') {
+    if(account === 'anonymous') {
+      return;
+    }
     if(this.loggingOut) {
       return;
     }
@@ -333,21 +350,22 @@ export class ApiManager extends ApiManagerMethods {
     }
 
     // WebPushApiManager.forceUnsubscribe(); // WARNING // moved to worker's master
-    const user = rootScope.myId || await sessionStorage.get("user_auth");
+    const user = account || rootScope.myId || await sessionStorage.get('user_auth');
     const keys = await Promise.all(storageKeys.map((key) => sessionStorage.get(key + '_auth_key' as any)));
 
     const logoutPromises: Promise<any>[] = [];
     for(let i = 0; i < storageKeys.length; i++) {
       if(keys[i] && user in keys[i]) {
-        logoutPromises.push(this.invokeApi('auth.logOut', {}, {dcId: (i + 1) as DcId, ignoreErrors: true}));
+        logoutPromises.push(this.invokeApi('auth.logOut', {}, {dcId: (i + 1) as DcId, ignoreErrors: true, forceAccount: account}));
       }
     }
 
     const clear = async() => {
-      this.baseDcId = undefined;
       await this.removeAccountFromStorage(user);
-      sessionStorage.delete("user_auth");
-      sessionStorage.delete("state_id");
+      if(account) return;
+      this.baseDcId = undefined;
+      sessionStorage.delete('user_auth');
+      sessionStorage.delete('state_id');
       // this.telegramMeNotify(false);
       // await toggleStorages(false, true);
       IDB.closeDatabases();
@@ -365,7 +383,7 @@ export class ApiManager extends ApiManagerMethods {
     }) */;
   }
 
-  private generateNetworkerGetKey(dcId: DcId, currentAuth: PeerId | "anonymous", transportType: TransportType, connectionType: ConnectionType) {
+  private generateNetworkerGetKey(dcId: DcId, currentAuth: PeerId | 'anonymous', transportType: TransportType, connectionType: ConnectionType) {
     return [dcId, currentAuth, transportType, connectionType].join('-');
   }
 
@@ -382,12 +400,20 @@ export class ApiManager extends ApiManagerMethods {
       };
     }
 
+    const state = await this.appStateManager.getState();
+    const currentAuth = options.forceAccount || ((state?.authState._ === 'authStateSignedIn' &&
+      await sessionStorage.get('user_auth')) ?? 'anonymous');
+
     const cache = this.cachedNetworkers[transportType][connectionType];
     if(!(dcId in cache)) {
-      cache[dcId] = [];
+      cache[dcId] = {};
     }
 
-    const networkers = cache[dcId];
+    if(!(currentAuth in cache[dcId])) {
+      cache[dcId][currentAuth] = [];
+    }
+
+    const networkers = cache[dcId][currentAuth];
     // @ts-ignore
     const maxNetworkers = connectionType === 'client' || transportType === 'https' ? 1 : (this.rootScope.premium ? PREMIUM_FILE_NETWORKERS_COUNT : REGULAR_FILE_NETWORKERS_COUNT);
     if(networkers.length >= maxNetworkers) {
@@ -418,10 +444,6 @@ export class ApiManager extends ApiManagerMethods {
       return Promise.resolve(networker);
     }
 
-    const state = await this.appStateManager.getState();
-    const currentAuth = options.forceAccount || ((state?.authState._ === "authStateSignedIn" &&
-      await sessionStorage.get("user_auth")) ?? "anonymous");
-
     let getKey = this.generateNetworkerGetKey(dcId, currentAuth, transportType, connectionType);
     if(this.gettingNetworkers[getKey]) {
       return this.gettingNetworkers[getKey];
@@ -430,7 +452,7 @@ export class ApiManager extends ApiManagerMethods {
     const ak: DcAuthKey = `dc${dcId}_auth_key` as any;
     const ss: DcServerSalt = `dc${dcId}_server_salt` as any;
 
-    let transport = this.chooseServer(dcId, connectionType, transportType);
+    let transport = this.chooseServer(dcId, currentAuth, connectionType, transportType);
     return this.gettingNetworkers[getKey] = Promise.all([ak, ss].map((key) => sessionStorage.get(key)))
     .then(async([authKeysHex, serverSaltsHex]) => {
       authKeysHex ??= {};
@@ -449,11 +471,6 @@ export class ApiManager extends ApiManagerMethods {
 
         networker = this.networkerFactory.getNetworker(dcId, authKey, authKeyId, serverSalt, options);
       } else {
-        if(currentAuth !== "anonymous") {
-          console.log(currentAuth, dcId)
-          // this.logOut();
-        }
-
         try { // if no saved state
           const auth = await this.authorizer.auth(dcId);
 
@@ -485,7 +502,7 @@ export class ApiManager extends ApiManagerMethods {
         DcConfigurator.removeTransport(this.dcConfigurator.chosenServers, transport);
 
         if(networker) {
-          transport = this.chooseServer(dcId, connectionType, newTransportType);
+          transport = this.chooseServer(dcId, currentAuth, connectionType, newTransportType);
         }
 
         this.log('transport has been changed during authorization from', transportType, 'to', newTransportType);
@@ -532,7 +549,7 @@ export class ApiManager extends ApiManagerMethods {
   }
 
   public setOnDrainIfNeeded(networker: MTPNetworker) {
-    if(!DESTROY_NETWORKERS || networker.onDrain) {
+    if(!DESTROY_NETWORKERS || networker.onDrain || networker.forceAccount) {
       return;
     }
 
@@ -545,6 +562,7 @@ export class ApiManager extends ApiManagerMethods {
       }
 
       if(canRelease) {
+        console.log('draining', networker.forceAccount);
         networker.onDrain = () => this.onNetworkerDrain(networker);
         networker.setDrainTimeout();
       }
@@ -596,7 +614,7 @@ export class ApiManager extends ApiManagerMethods {
 
       if((error.code === 401 && error.type === 'SESSION_REVOKED') ||
         (error.code === 406 && error.type === 'AUTH_KEY_DUPLICATED')) {
-        this.logOut();
+        this.logOut(options.forceAccount);
       }
 
       if(options.ignoreErrors) {
@@ -613,7 +631,7 @@ export class ApiManager extends ApiManagerMethods {
         setTimeout(() => {
           if(!error.handled) {
             if(error.code === 401) {
-              this.logOut();
+              this.logOut(options.forceAccount);
             } else {
               // ErrorService.show({error: error}); // WARNING
             }
@@ -757,11 +775,18 @@ export class ApiManager extends ApiManagerMethods {
       });
     }
 
+    dcId = options.dcId || this.baseDcId
     let p: Promise<MTPNetworker>;
-    if(dcId = (options.dcId || this.baseDcId)) {
+    if(!options.forceAccount && dcId) {
       p = this.getNetworker(dcId, options);
     } else {
-      p = this.getBaseDcId().then((baseDcId) => this.getNetworker(dcId = baseDcId, options));
+      let baseDcId;
+      if(!options.forceAccount || options.forceAccount === 'anonymous') {
+        baseDcId = this.getBaseDcId();
+      } else {
+        baseDcId = sessionStorage.get('accounts').then(accounts => +accounts[options.forceAccount as number].dcID)
+      }
+      p = baseDcId.then((baseDcId) => this.getNetworker(dcId = baseDcId, options));
     }
 
     p.then((networker) => {

@@ -45,8 +45,8 @@ export class MTTransportController extends EventListenerBase<{
     const dcConfigurator = this.dcConfigurator ??= new DcConfigurator();
     const timeout = 2000;
     const transports: {[k in TransportType]?: MTTransport} = this.transports = {
-      https: dcConfigurator.chooseServer(App.baseDcId, 'client', 'https', false),
-      websocket: dcConfigurator.chooseServer(App.baseDcId, 'client', 'websocket', false)
+      https: dcConfigurator.chooseServer(App.baseDcId, 'anonymous', 'client', 'https', false),
+      websocket: dcConfigurator.chooseServer(App.baseDcId, 'anonymous', 'client', 'websocket', false)
     };
 
     const httpPromise = deferredPromise<boolean>();

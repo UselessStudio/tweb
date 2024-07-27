@@ -34,7 +34,7 @@ class ContextMenuController extends OverlayClickHandler {
   }
 
   private isOutOfRange(x: number, y: number,
-                        {top, bottom, right, left}: {top: number, bottom: number, left: number, right: number}): boolean {
+    {top, bottom, right, left}: {top: number, bottom: number, left: number, right: number}): boolean {
     const diffX = x >= right ? x - right : left - x;
     const diffY = y >= bottom ? y - bottom : top - y;
     return diffX >= 100 || diffY >= 100;
@@ -44,19 +44,19 @@ class ContextMenuController extends OverlayClickHandler {
     const element = findUpClassName(e.target, 'btn-menu-item');
     // const inner = (element as any)?.inner as ButtonMenuItemOptions['inner'];
 
-    const inner = this.element.querySelector(".inner.btn-menu") as HTMLElement;
-    if(element?.classList.contains("has-inner")) {
-      inner.classList.add("active");
+    const inner = this.element.querySelector('.inner.btn-menu') as HTMLElement;
+    if(element?.classList.contains('has-inner')) {
+      inner.classList.add('active');
     }
 
     const {clientX, clientY} = e;
-    const innerButton = this.element.querySelector(".btn-menu-item.has-inner");
-    const innerRect = this.element.querySelector(".inner.active")?.getBoundingClientRect();
-    if(innerButton && innerRect
-      && this.isOutOfRange(clientX, clientY, innerButton.getBoundingClientRect())
-      && this.isOutOfRange(clientX, clientY, innerRect)) {
+    const innerButton = this.element.querySelector('.btn-menu-item.has-inner');
+    const innerRect = this.element.querySelector('.inner.active')?.getBoundingClientRect();
+    if(innerButton && innerRect &&
+      this.isOutOfRange(clientX, clientY, innerButton.getBoundingClientRect()) &&
+      this.isOutOfRange(clientX, clientY, innerRect)) {
       // console.log(innerButton.getBoundingClientRect());
-      inner.classList.remove("active");
+      inner.classList.remove('active');
     }
 
     const rect = this.element.getBoundingClientRect();

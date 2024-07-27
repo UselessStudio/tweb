@@ -52,7 +52,7 @@ class ApiUpdatesManager {
   private channelStates: {[channelId: ChatId]: UpdatesState} = {};
   private attached = false;
 
-  private log = logger('UPDATES', LogTypes.Error | LogTypes.Warn | LogTypes.Log/*  | LogTypes.Debug */);
+  protected log = logger('UPDATES', LogTypes.Error | LogTypes.Warn | LogTypes.Log/*  | LogTypes.Debug */);
   private debug = DEBUG;
 
   private subscriptions: {[channelId: ChatId]: {count: number, interval?: number}} = {};
@@ -239,8 +239,7 @@ class ApiUpdatesManager {
 
       case 'updatesCombined':
       case 'updates':
-        this.appUsersManager.saveApiUsers(updateMessage.users, options.override);
-        this.appChatsManager.saveApiChats(updateMessage.chats, options.override);
+        this.saveUpdateData(updateMessage, options);
 
         updateMessage.updates.forEach((update: Update) => {
           this.processUpdate(update, processOpts);
@@ -251,6 +250,12 @@ class ApiUpdatesManager {
         log.warn('unknown update message', updateMessage);
     }
   };
+
+  protected saveUpdateData(updateMessage: Updates.updates | Updates.updatesCombined, options: {override?: boolean}) {
+    this.appUsersManager.saveApiUsers(updateMessage.users, options.override);
+    this.appChatsManager.saveApiChats(updateMessage.chats, options.override);
+  }
+
 
   private getDifference(first = false): Promise<void> {
     const log = this.log.bindPrefix('getDifference');

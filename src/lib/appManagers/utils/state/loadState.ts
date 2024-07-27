@@ -186,7 +186,7 @@ async function loadStateInner() {
     }
   } */
 
-  if(auth && state.authState._ !== "authStateAddAccount") {
+  if(auth && state.authState._ !== 'authStateAddAccount') {
     // ! Warning ! DON'T delete this
     await sessionStorage.set({
       dc: +auth.dcID
@@ -211,7 +211,7 @@ async function loadStateInner() {
       state[key] = value;
     });
 
-    const r: (keyof StoragesResults)[] = ['chats', 'dialogs']//, 'users'];
+    const r: (keyof StoragesResults)[] = ['dialogs']// , 'chats', 'users'];
     for(const key of r) {
       resetStorages.add(key);
       // this.storagesResults[key as keyof AppStateManager['storagesResults']].length = 0;
@@ -230,7 +230,7 @@ async function loadStateInner() {
     });
   }
 
-  if(state.authState._ === "authStateAddAccount") {
+  if(state.authState._ === 'authStateAddAccount') {
     resetState(['settings']);
   }
 

@@ -35,6 +35,7 @@ import {getPeerAvatarColorByPeer} from './utils/peers/getPeerColorById';
 import getPeerId from './utils/peers/getPeerId';
 import {logger} from '../logger';
 import LazyLoadQueueBase from '../../components/lazyLoadQueueBase';
+import sessionStorage from '../sessionStorage';
 
 type MyNotification = Notification & {
   hidden?: boolean,
@@ -85,6 +86,7 @@ export class UiNotificationsManager {
   private topMessagesDeferred: CancellablePromise<void>;
 
   private settings: NotificationSettings = {} as any;
+  private showForAllAccounts: boolean = true;
 
   private registeredDevice: any;
   private pushInited = false;
@@ -247,11 +249,13 @@ export class UiNotificationsManager {
   }
 
   public async buildNotification({
+    toAccount,
     message,
     fwdCount,
     peerReaction,
     peerTypeNotifySettings
   }: {
+    toAccount?: PeerId,
     message: Message.message | Message.messageService,
     fwdCount?: number,
     peerReaction?: MessagePeerReaction,
@@ -328,9 +332,22 @@ export class UiNotificationsManager {
         notification.title;
     }
 
+    if(toAccount) {
+      if(!this.showForAllAccounts) return;
+      const accountName = await getPeerTitle({peerId: toAccount, plainText: true});
+      notification.title += ' → ' + accountName;
+    }
+
     notification.title = wrapPlainText(notification.title);
 
     notification.onclick = () => {
+      if(toAccount) {
+        sessionStorage.set({
+          user_auth: toAccount
+        });
+        appRuntimeManager.reload();
+        return;
+      }
       appImManager.setInnerPeer({peerId, lastMsgId: message.mid, threadId});
     };
 
@@ -648,6 +665,7 @@ export class UiNotificationsManager {
 
     apiManagerProxy.getState().then((state) => {
       this.settings.nosound = !state.settings.notifications.sound;
+      this.showForAllAccounts = state.settings.notifications.allAccounts;
     });
   }
 

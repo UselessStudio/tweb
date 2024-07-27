@@ -7,7 +7,7 @@
 import applyMixins from '../../helpers/applyMixins';
 import EventListenerBase from '../../helpers/eventListenerBase';
 import {AppManager} from '../appManagers/manager';
-import sessionStorage from "../sessionStorage.js";
+import sessionStorage from '../sessionStorage.js';
 
 export type StatePeerType = 'recentSearch' | 'topPeer' | 'dialog' | 'contact' | 'topMessage' | 'self' | 'account';
 
@@ -24,10 +24,10 @@ class PeersStorage {
   protected after() {
     this.rootScope.addEventListener('user_auth', () => {
       this.requestPeer(this.appPeersManager.peerId, 'self');
-      sessionStorage.get("accounts").then(accs => {
+      sessionStorage.get('accounts').then(accs => {
         const peers = Object.keys(accs)
-          .map(p => p.toPeerId(false))
-          .filter(p => p !== this.appPeersManager.peerId);
+        .map(p => p.toPeerId())
+        .filter(p => p !== this.appPeersManager.peerId);
         peers.forEach(peer => {
           this.requestPeer(peer, 'account');
         })
