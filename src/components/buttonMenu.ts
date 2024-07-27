@@ -20,7 +20,6 @@ import Icon from './icon';
 import RadioForm from './radioForm';
 import wrapAttachBotIcon from './wrappers/attachBotIcon';
 import callbackify from '../helpers/callbackify.js';
-import ButtonMenuToggle from './buttonMenuToggle.js';
 import filterAsync from '../helpers/array/filterAsync.js';
 
 type ButtonMenuItemInner = Omit<Parameters<typeof ButtonMenuSync>[0], 'listenerSetter' | 'buttons'> & {buttons: ButtonMenuItemOptionsVerifiable[]};

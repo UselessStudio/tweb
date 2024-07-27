@@ -4,7 +4,6 @@
  * https://github.com/morethanwords/tweb/blob/master/LICENSE
  */
 
-import {ButtonMenuItemOptions} from '../components/buttonMenu';
 import IS_TOUCH_SUPPORTED from '../environment/touchSupport';
 import findUpClassName from './dom/findUpClassName';
 import mediaSizes from './mediaSizes';

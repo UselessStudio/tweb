@@ -5,7 +5,6 @@
  */
 
 import ctx from '../../environment/ctx';
-import assumeType from '../../helpers/assumeType';
 import callbackify from '../../helpers/callbackify';
 import {ignoreRestrictionReasons} from '../../helpers/restrictions';
 import {Config, DataJSON, HelpAppConfig, HelpPeerColors, MethodDeclMap, User} from '../../layer';

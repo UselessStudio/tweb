@@ -20,7 +20,6 @@ import {IS_WEB_WORKER} from '../../helpers/context';
 import {DcId} from '../../types';
 import {getEnvironment} from '../../environment/utils';
 import SocketProxied from './transports/socketProxied';
-import MTPNetworker from './networker';
 
 export type TransportType = 'websocket' | 'https' | 'http';
 export type ConnectionType = 'client' | 'download' | 'upload';

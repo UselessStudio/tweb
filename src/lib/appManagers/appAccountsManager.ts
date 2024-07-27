@@ -8,7 +8,6 @@ import {AnyDialog} from '../storages/dialogs';
 import {MyMessage} from './appMessagesManager';
 import {NULL_PEER_ID} from '../mtproto/mtproto_config';
 import getPeerId from './utils/peers/getPeerId';
-import deepEqual from '../../helpers/object/deepEqual';
 
 class AccountUpdatesManager extends ApiUpdatesManager {
   private dialogs: Record<PeerId, Dialog.dialog> = {};
@@ -95,7 +94,6 @@ class AccountUpdatesManager extends ApiUpdatesManager {
     const {peer, msg_id, top_msg_id, reactions} = update;
     const channelId = (peer as Peer.peerChannel).channel_id;
     const mid = this.appMessagesIdsManager.generateMessageId(msg_id, channelId);
-    const threadId = this.appMessagesIdsManager.generateMessageId(top_msg_id, channelId);
     const peerId = this.appPeersManager.getPeerId(peer);
     const message: MyMessage = this.outMessages[peerId]?.[mid];
 
@@ -108,7 +106,6 @@ class AccountUpdatesManager extends ApiUpdatesManager {
     const previousReactions = message.reactions;
     const previousRecentReactions = previousReactions?.recent_reactions;
     const isUnread = recentReactions?.some((reaction) => reaction.pFlags.unread);
-    const wasUnread = !!previousRecentReactions?.some((reaction) => reaction.pFlags.unread);
     this.log('reaction', recentReactions, message);
     if(recentReactions?.length && message.pFlags.out) { // * if user added a reaction to our message
       const recentReaction = recentReactions[recentReactions.length - 1];
