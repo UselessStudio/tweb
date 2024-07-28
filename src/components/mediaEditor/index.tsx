@@ -18,9 +18,18 @@ import {PaintingInfo, PaintingLayer} from './brushItems';
 import {Document} from '../../layer';
 import SuperStickerRenderer from '../emoticonsDropdown/tabs/SuperStickerRenderer';
 import LazyLoadQueue from '../lazyLoadQueue';
-import {applyBrightnessContrast} from './effects/applyBrightnessContrast';
-import {applySaturation} from './effects/applySaturation';
 import {textRenderer} from './textRenderer';
+import {createContrastFilter} from './effects/createContrastFilter';
+import {createSaturationFilter} from './effects/createSaturationFilter';
+import {createWarmthFilter} from './effects/createWarmthFilter';
+import {applyFilters} from './effects/applyFilter';
+import {applySharpness} from './effects/applySharpness';
+import {createBrightnessFilter} from './effects/createBrightnessFilter';
+import {createShadowsHighlightsFilter} from './effects/createShadowsHighlightsFilter';
+import {applyVignette} from './effects/applyVignette';
+import {createGrainFilter} from './effects/createGrainFilter';
+import {createFadeFilter} from './effects/createFadeFilter';
+import {createEnhanceFilter} from './effects/createEnhanceFilter';
 
 
 class Editor {
@@ -84,8 +93,8 @@ class Editor {
       newWidth = editorElementWidth;
     }
 
-    this.workSpaceEditorElement.style.width = this.image.style.width = `${newWidth}px`;
-    this.workSpaceEditorElement.style.height = this.image.style.height = `${newHeight}px`;
+    this.workSpaceEditorElement.style.width = this.effectsCanvas.style.width = `${newWidth}px`;
+    this.workSpaceEditorElement.style.height = this.effectsCanvas.style.height = `${newHeight}px`;
 
     const {width: workSpaceEditorWidth, height: workSpaceEditorHeight} = this.workSpaceEditorElement.getBoundingClientRect();
     const top = editorElementHeight / 2 - workSpaceEditorHeight / 2;
@@ -208,8 +217,19 @@ class Editor {
     this.effectsCanvas.height = this.image.height;
     const ctx = this.effectsCanvas.getContext('2d');
     ctx.drawImage(this.image, 0, 0);
-    applyBrightnessContrast(ctx, this.effects.brightness, this.effects.contrast);
-    applySaturation(ctx, this.effects.saturation);
+    if(this.image.width === 0 || this.image.height === 0) return;
+    applyFilters(ctx, [
+      createEnhanceFilter(this.effects.enhance),
+      createContrastFilter(this.effects.contrast),
+      createBrightnessFilter(this.effects.brightness),
+      createWarmthFilter(this.effects.warmth),
+      createSaturationFilter(this.effects.saturation),
+      createShadowsHighlightsFilter(this.effects.shadows, this.effects.highlights),
+      createGrainFilter(this.effects.grain),
+      createFadeFilter(this.effects.fade)
+    ]);
+    applySharpness(ctx, this.effects.sharpen);
+    applyVignette(ctx, this.effects.vignette);
   }
 
   public setPaintingInfo({size, color}: PaintingInfo) {
@@ -238,6 +258,7 @@ class Editor {
 
     this.stickersLayer.proccess(canvas);
     await this.textsLayer.proccess(canvas);
+    console.log(canvas);
 
     return new Promise((resolve) => {
       canvas.toBlob((blob) => {
@@ -1536,7 +1557,7 @@ export class Transformable {
       }, false);
     })
 
-    resize(this.initialMinWidth, this.initialMinHeight);
+    resize(this.initialWidth, this.initialHeight);
     repositionElement(this.initialLeft, this.initialTop);
   }
 }
@@ -1802,8 +1823,8 @@ class StickersLayer {
       attachTo: this.target,
       children: container,
       options: {
-        minHeight: 200,
-        minWidth: 200,
+        minHeight: 80,
+        minWidth: 80,
         width: 300,
         height: 300,
         left: this.target?.clientLeft + this.target?.clientWidth / 2,
