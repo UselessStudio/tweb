@@ -3,7 +3,7 @@ import './mediaEdtior.scss';
 import PopupElement from '../popups';
 import {IconTsx} from '../iconTsx';
 import {Tabs} from '../sidebarRight/tabs/boosts';
-import {createEffect, createSignal, For, JSX, onCleanup, onMount, splitProps} from 'solid-js';
+import {createEffect, createSignal, For, JSX, JSXElement, onCleanup, onMount, splitProps} from 'solid-js';
 import {MediaEditorSelector} from './mediaEditorSelector/mediaEditorSelector';
 import {i18n, LangPackKey} from '../../lib/langPack';
 import Scrollable from '../scrollable';
@@ -18,7 +18,7 @@ import {PaintingInfo, PaintingLayer} from './brushItems';
 import {Document} from '../../layer';
 import SuperStickerRenderer from '../emoticonsDropdown/tabs/SuperStickerRenderer';
 import LazyLoadQueue from '../lazyLoadQueue';
-import {drawText} from './renderText';
+import {textRenderer} from './textRenderer';
 import {createContrastFilter} from './effects/createContrastFilter';
 import {createSaturationFilter} from './effects/createSaturationFilter';
 import {createWarmthFilter} from './effects/createWarmthFilter';
@@ -751,34 +751,42 @@ export const PaintController = ({
 const fonts = [
   {
     value: 'roboto',
+    font: 'roboto',
     active: false
   },
   {
     value: 'typewriter',
+    font: 'type writer',
     active: false
   },
   {
     value: 'avenirNext',
+    font: 'avenir next',
     active: false
   },
   {
-    value: 'courierNew',
+    value: 'couriernew',
+    font: 'courier new',
     active: false
   },
   {
     value: 'noteworthy',
+    font: 'noteworthy',
     active: false
   },
   {
     value: 'georgia',
+    font: 'georgia',
     active: false
   },
   {
     value: 'papyrus',
+    font: 'papyrus',
     active: false
   },
   {
     value: 'snellRoundhand',
+    font: 'snell roundhand',
     active: false
   }
 ]
@@ -803,39 +811,62 @@ const alignItems = [
 
 const fontDecoration = [
   {
-    value: 'color',
+    value: 'filled',
     icon: () => <IconTsx icon={'text_fill_color'} />,
     active: false
   },
   {
-    value: 'border',
+    value: 'stroke',
     icon: () => <IconTsx icon={'text_border_color'} />,
     active: false
   },
   {
-    value: 'background',
+    value: 'highlight',
     icon: () => <IconTsx icon={'text_background_color'} />,
     active: false
   }
 ]
 
 export const TextController = ({
-  getRenderPicker
+  getRenderPicker,
+  getColorPickerColor,
+  setColorPickerColor,
+  getIsColorPickerActive,
+  setIsColorPickerActive,
+  getFontSize, setFontSize,
+  getFontsItems,
+  setTargetFontItem,
+  getAlignItems,
+  setTargetAlignItem,
+  getFontDecorationItems, setTargetFontDecoration
 }: {
   getRenderPicker: () => boolean
+  getColorPickerColor: () => string,
+  setColorPickerColor: (color: string) => void,
+  getIsColorPickerActive: () => boolean,
+  setIsColorPickerActive: (color: boolean) => void,
+  getFontSize: () => number,
+  setFontSize: (size: number) => void,
+  getFontsItems: () => Array<{ value: string, active: boolean }>,
+  setTargetFontItem: (value: string) => void,
+  getAlignItems: () => Array<{ value: string, active: boolean, icon: () => JSXElement }>,
+  setTargetAlignItem: (value: string) => void
+  getFontDecorationItems: () => Array<{ value: string, active: boolean, icon: () => JSXElement }>,
+  setTargetFontDecoration: (decoration: string) => void
 }) => {
-  const [effects, setEffects] = createSignal<MediaEditorEffects>(getDefaultEffects());
-  const {getColor, setColor, getIsColorPickerActive, setIsColorPickerActive} = useColorPicker();
-  const [getSize, setSize] = createSignal(24);
-  const {getItems: getFontsItems, setTarget} = useListTarget(fonts);
-  const {getItems: getAlignItems, setTarget: setTargetAlignItem} = useListTarget(alignItems);
-  const {getItems: getFontDecoration, setTarget: setTargetFontDecoration} = useListTarget(fontDecoration);
+  // const {getColor, setColor, getIsColorPickerActive, setIsColorPickerActive} = useColorPicker();
+  // const [getSize, setSize] = createSignal(24);
+  // const {getItems: getFontsItems, setTarget} = useListTarget(fonts);
+  // const {getItems: getAlignItems, setTarget: setTargetAlignItem} = useListTarget(alignItems);
+  // const {getItems: getFontDecoration, setTarget: setTargetFontDecoration} = useListTarget(fontDecoration);
 
   return (
-    <SimpleScrollableYTsx class={'media-editor-container-toolbar-section media-editor-container-toolbar-effects'}>
+    <SimpleScrollableYTsx
+      class={'media-editor-container-toolbar-section media-editor-container-toolbar-effects'}
+    >
       {getRenderPicker() && <MediaEditorColorPicker
-        getColor={getColor}
-        onSetColor={setColor}
+        getColor={getColorPickerColor}
+        onSetColor={setColorPickerColor}
         getIsColorPickerActive={getIsColorPickerActive}
         setIsColorPickerActive={setIsColorPickerActive}
       />}
@@ -855,7 +886,7 @@ export const TextController = ({
           </For>
         </div>
         <div class={'media-editor-row-list'}>
-          <For each={getFontDecoration()}>
+          <For each={getFontDecorationItems()}>
             {(item) => (
               <div
                 class={classNames('media-editor-row-list-item', item.active && 'active')}
@@ -872,13 +903,13 @@ export const TextController = ({
       <div class={'media-editor-container-size-range'}>
         <MediaEditorRangeItem
           name={'size'}
-          getValue={getSize}
-          setValue={setSize}
+          getValue={getFontSize}
+          setValue={setFontSize}
           min={12}
           max={72}
           fillFromMiddle={false}
           step={2}
-          getColor={getColor}
+          getColor={getColorPickerColor}
         />
       </div>
       <div class={'media-editor-list'}>
@@ -889,7 +920,7 @@ export const TextController = ({
           {(item) => (
             <div
               class={classNames('media-editor-list-item', item.active && 'active')}
-              onClick={() => setTarget(item.value)}
+              onClick={() => setTargetFontItem(item.value)}
             >
               <span class={'media-editor-list-item-text'}>
                 {item.value}
@@ -1104,12 +1135,17 @@ export class Transformable {
   attachToInitialWidth: number;
   attachToInitialHeight: number;
 
+  highlight: HTMLElement;
+  highlightBlur: HTMLElement;
+
   public onChange: (options?: {
     left: number,
     top: number,
     width: number,
     height: number,
-    rotate: number
+    rotation: number,
+    containerWidth: number,
+    containerHeight: number
   }) => void;
 
   private initElements() {
@@ -1169,6 +1205,34 @@ export class Transformable {
     );
   }
 
+  public enableHighlight() {
+    this.highlightBlur = document.createElement('div');
+    this.highlightBlur.style.position = 'absolute';
+    this.highlightBlur.style.top = this.highlightBlur.style.left = '0';
+    this.highlightBlur.style.width = this.highlightBlur.style.height = '100%';
+    this.highlightBlur.style.background = '#D9D9D9';
+    this.highlightBlur.style.opacity = '0.3';
+    this.highlightBlur.style.pointerEvents = 'none';
+    this.highlight = document.createElement('div');
+    this.highlight.style.zIndex = '30';
+    this.highlight.style.position = 'absolute';
+    this.highlight.style.top = this.highlight.style.left = '0';
+    this.highlight.style.width = this.highlight.style.height = '100%';
+    this.highlight.style.background = 'white';
+    this.highlight.style.opacity = '0.3';
+    this.highlight.style.pointerEvents = 'none';
+
+    this.attachTo.append(this.highlightBlur);
+    this.box.append(this.highlight);
+  }
+
+  public disableHighlight() {
+    if(!this.highlightBlur) return;
+
+    this.highlightBlur.remove();
+    this.highlight.remove();
+  }
+
   public disable() {
     this.resizableElement.style.display = 'none';
     this.leftTop.style.display = 'none';
@@ -1195,6 +1259,10 @@ export class Transformable {
 
     this.currentDegree = angle * 180 / Math.PI - this.degreeOffset;
     this.boxWrapper.style.transform = `rotate(${this.currentDegree}deg)`;
+
+    if(this.onChange) {
+      this.onChange(this.getCurrnetTransform());
+    }
   }
 
   public getCurrnetTransform() {
@@ -1284,6 +1352,10 @@ export class Transformable {
       this.boxWrapper.style.left = x + 'px';
       this.boxWrapper.style.top = y + 'px';
 
+      if(this.onChange) {
+        this.onChange(this.getCurrnetTransform());
+      }
+
       if(save) {
         this.x = x;
         this.y = y;
@@ -1297,6 +1369,10 @@ export class Transformable {
       if(save) {
         this.width = (this.aspectRatio ? h * this.aspectRatio : w);
         this.height = h;
+      }
+
+      if(this.onChange) {
+        this.onChange(this.getCurrnetTransform());
       }
 
       this.resizableElement.style.backgroundImage = `url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='${(this.aspectRatio ? h * this.aspectRatio : w) + 8}' height='${h + 8}' x='2' y='2' fill='none' stroke='hsla(0, 0%, 100%, 0.2)' stroke-width='2' stroke-dasharray='6%2c 14' stroke-dashoffset='0' stroke-linecap='round'/%3e%3c/svg%3e")`;
@@ -1486,15 +1562,65 @@ export class Transformable {
   }
 }
 
+type TextBlokState = {
+  size: number,
+  color: string,
+  type: 'stroke' | 'highlight' | 'filled',
+  align: 'left' | 'center' | 'right',
+  font: string
+}
+
 class TextsLayer {
   appendTo: HTMLElement;
   textBlocks: Array<{
+    id: string,
     transformable: Transformable,
-    textBlock: HTMLElement
+    textBlock: HTMLTextAreaElement,
+    state: TextBlokState
   }>
   attachTo: HTMLElement;
   target: HTMLElement;
-  textarea: HTMLTextAreaElement;
+  subscribe: () => void
+
+  targetBlockId: string
+
+  public onTargetBlockSet: (block?: {
+    transformable: Transformable,
+    textBlock: HTMLTextAreaElement,
+    state: TextBlokState
+  }) => void
+
+  private getTargetBlock = () => {
+    return this.textBlocks.find((block) => this.targetBlockId === block.id)
+  }
+
+  public setTargetBlock(id?: string) {
+    if(this.getTargetBlock()) {
+      this.getTargetBlock().transformable.disableHighlight()
+    }
+
+    this.targetBlockId = id;
+
+    if(!this.targetBlockId) {
+      return;
+    }
+
+    const newTarget = this.textBlocks.find((block) => id === block.id);
+
+    if(!newTarget) {
+      return;
+    }
+
+    newTarget.transformable.enableHighlight()
+    if(this.onTargetBlockSet) {
+      console.log(newTarget.state);
+      this.onTargetBlockSet({
+        transformable: newTarget.transformable,
+        state: newTarget.state,
+        textBlock: newTarget.textBlock
+      });
+    }
+  }
 
   constructor(attachTo: HTMLElement) {
     this.attachTo = attachTo;
@@ -1508,16 +1634,31 @@ class TextsLayer {
     this.disableLayer();
   }
 
-  public setTextBlockStyle(options: {
-    textAlign: string,
-    color: string,
+  public setTextBlockStyle({
+    size,
+    color,
+    type,
+    align,
+    font
+  }: {
     size: number,
-    fontFamily: string
+    color: string,
+    type: 'stroke' | 'highlight' | 'filled',
+    align: 'left' | 'center' | 'right',
+    font: string
   }) {
-    this.target.style.textAlign = 'center';
-    this.target.style.color = 'white';
-    this.target.style.fontSize = 'center';
-    this.target.style.fontFamily = 'Roboto';
+    const target = this.getTargetBlock();
+
+    if(!target) {
+      return;
+    }
+
+    const index = this.textBlocks.findIndex(() => f)
+
+    target.textBlock.style.textAlign = align;
+    target.textBlock.style.color = color;
+    target.textBlock.style.fontSize = `${size}px`;
+    target.textBlock.style.fontFamily = font;
   }
 
   public addTextBlock() {
@@ -1527,7 +1668,13 @@ class TextsLayer {
     textBlock.style.zIndex = '10';
     textBlock.classList.add('media-editor-textblock');
     textBlock.oninput = (e) => e.stopPropagation();
-    this.textarea = textBlock;
+    const state: TextBlokState = {
+      size: 20,
+      color: '#FFFFFF',
+      type: 'filled',
+      align: 'center',
+      font: 'Roboto'
+    }
 
     const transformable = new Transformable();
     transformable.init({
@@ -1544,10 +1691,29 @@ class TextsLayer {
     });
     transformable.boxContent.style.padding = '8px'
 
+    const id = '#' + Date.now();
     this.textBlocks.push({
+      id: id,
       textBlock,
-      transformable
+      transformable,
+      state
     });
+
+    this.subscribe = () => {
+      this.setTargetBlock();
+      window.removeEventListener('mousedown', this.subscribe)
+    }
+
+    textBlock.onfocus = () => {
+      this.setTargetBlock(id);
+      window.addEventListener('mousedown', this.subscribe)
+      transformable.attachTo.onmousedown = ((e: MouseEvent) => {
+        e.stopPropagation();
+      }).bind(this);
+    }
+
+    this.setTargetBlock(textBlock.id)
+    textBlock.focus();
   }
 
   public async proccess(canvas: HTMLCanvasElement) {
@@ -1568,15 +1734,14 @@ class TextsLayer {
     for(const textBlock of this.textBlocks) {
       const {width, height, left, top, rotation} = textBlock.transformable.getCurrnetTransform();
 
-      const {canvas} = drawText({
-        fontName: 'arial',
-        width: width,
-        text: this.textarea.value,
-        fontSize: 18
-      });
+      const textCanvas = document.createElement('canvas');
+      textCanvas.width = width;
+      textCanvas.height = height;
 
-      const targetWidth = canvas.width * deltaWidth;
-      const targetHeight = canvas.height / 2 * deltaHeight;
+      textRenderer(textCanvas, textBlock.textBlock.value, {})
+
+      const targetWidth = textCanvas.width * deltaWidth;
+      const targetHeight = textCanvas.height * deltaHeight;
 
       const targetLeft = left * deltaWidth - targetWidth / 2;
       const targetTop = top * deltaHeight - targetHeight / 2;
@@ -1585,17 +1750,33 @@ class TextsLayer {
       context.translate(targetLeft + targetWidth / 2, targetTop + targetHeight / 2);
       context.rotate(rotation * (Math.PI / 180));
       context.translate(- targetLeft - targetWidth / 2, - targetTop - targetHeight / 2);
-      context.drawImage(canvas, targetLeft, targetTop, targetWidth, targetHeight);
+      context.drawImage(textCanvas, targetLeft, targetTop, targetWidth, targetHeight);
       context.restore();
     }
+  }
+
+  private removeEmptyLayers = () => {
+    this.textBlocks = this.textBlocks.filter((textBlock) => {
+      if(!textBlock.textBlock.value) {
+        textBlock.textBlock.remove();
+        return false;
+      }
+
+      return true;
+    })
   }
 
   public disableLayer() {
     this.textBlocks.forEach(el => el.transformable.disable());
     this.target.style.pointerEvents = 'none';
+
+    if(this.subscribe) {
+      this.subscribe();
+    }
   }
 
   public enableLayer() {
+    this.removeEmptyLayers();
     this.textBlocks.forEach(el => el.transformable.enable());
     this.target.style.pointerEvents = 'unset';
   }
@@ -1679,7 +1860,7 @@ class StickersLayer {
 
     this.stickers.forEach((sticker) => {
       const {width, height, left, top, rotation} = sticker.transformable.getCurrnetTransform();
-      const img = sticker.stickerEl.children[0] as HTMLCanvasElement | HTMLImageElement;
+      const img = sticker.stickerEl.querySelector('canvas') || sticker.stickerEl.querySelector('img') as HTMLCanvasElement | HTMLImageElement;
 
       const targetWidth = width * deltaWidth;
       const targetHeight = height * deltaHeight;
@@ -1715,6 +1896,13 @@ export const MediaEditor = ({
   url: string
 }) => {
   const {getColor, setColor, getIsColorPickerActive, setIsColorPickerActive, getBrash, setBrash, setBrashSize, getBrashSize} = usePaintController();
+
+  const {getColor: getColorPickerColor, setColor: setColorPickerColor, getIsColorPickerActive: getIsTextColorPickerActive, setIsColorPickerActive: setIsTextColorPickerActive} = useColorPicker();
+  const [getSize, setSize] = createSignal(24);
+  const {getItems: getFontsItems, setTarget, getTarget: font} = useListTarget(fonts);
+  const {getItems: getAlignItems, setTarget: setTargetAlignItem, getTarget: align} = useListTarget(alignItems);
+  const {getItems: getFontDecoration, setTarget: setTargetFontDecoration, getTarget: type} = useListTarget(fontDecoration);
+
   const [tab, setTab] = createSignal(0);
   let mediaEditorRef: HTMLDivElement;
   let editor: Editor;
@@ -1753,6 +1941,25 @@ export const MediaEditor = ({
   })
 
   createEffect(() => {
+    if(tab() === 3 && !editor.textsLayer.onTargetBlockSet) {
+      editor.textsLayer.onTargetBlockSet = (state) => {
+        const {
+          size,
+          color,
+          type,
+          align,
+          font
+        } = state.state
+        setSize(size);
+        setColorPickerColor(color);
+        setTargetFontDecoration(type);
+        setTargetAlignItem(align);
+        setTarget(font)
+      }
+    }
+  })
+
+  createEffect(() => {
     if(tab() === 4) {
       editor.enableStickersLayer();
     } else {
@@ -1768,6 +1975,20 @@ export const MediaEditor = ({
       editor.disableTextsLayer();
     }
   });
+
+  createEffect(() => {
+    if(!editor.textsLayer) return;
+
+    const f = font()
+
+    editor.textsLayer.setTextBlockStyle({
+      font: fonts.find((v) => f === v.font).font,
+      size: getSize(),
+      color: getColorPickerColor(),
+      align: align(),
+      type: type()
+    } as any)
+  })
 
   const onProcess = async() => {
     const blob = await editor.process();
@@ -1785,7 +2006,7 @@ export const MediaEditor = ({
 
         </div>
       </div>
-      <div class={'media-editor-container-toolbar'}>
+      <div class={'media-editor-container-toolbar'} onMouseDown={(e) => e.stopPropagation()}>
         <div class={'media-editor-container-toolbar-header'}>
           <div class={'media-editor-container-toolbar-header-btn-close'}>
             <button class={'btn-icon'} onClick={() => close()}>
@@ -1818,7 +2039,21 @@ export const MediaEditor = ({
           content={[
             <EffectsController onEffectsUpdated={e => editor.setEffects(e)} />,
             <ScreenAspectRatioController />,
-            <TextController getRenderPicker={() => tab() === 2} />,
+            <TextController
+              getColorPickerColor={getColorPickerColor}
+              setColorPickerColor={setColorPickerColor}
+              getFontSize={getSize}
+              setFontSize={setSize}
+              getIsColorPickerActive={getIsTextColorPickerActive}
+              setIsColorPickerActive={setIsTextColorPickerActive}
+              getFontsItems={getFontsItems}
+              setTargetFontItem={setTarget}
+              getAlignItems={getAlignItems}
+              setTargetAlignItem={setTargetAlignItem}
+              getFontDecorationItems={getFontDecoration}
+              setTargetFontDecoration={setTargetFontDecoration}
+              getRenderPicker={() => tab() === 2}
+            />,
             <PaintController
               getRenderPicker={() => tab() === 3}
               getColor={getColor}
