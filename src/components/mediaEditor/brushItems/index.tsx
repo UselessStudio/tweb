@@ -455,6 +455,11 @@ export class PaintingLayerBrush extends PaintingLayer {
     this.brushCanvas.width = this.canvas.width;
     this.brushCanvas.height = this.canvas.height;
     this.brushContext2d = this.brushCanvas.getContext('2d');
+    if(IS_CANVAS_FILTER_SUPPORTED) {
+      this.brushContext2d.filter = 'blur(10px)';
+    } else {
+      boxBlurCanvasRGB(this.brushContext2d, 0, 0, this.canvas.width, this.canvas.height, 20, 1);
+    }
   }
 
   protected draw<EventListener>(event: MouseEvent) {
@@ -470,7 +475,6 @@ export class PaintingLayerBrush extends PaintingLayer {
     this.brushContext2d.strokeStyle = `rgb(${hexToRgb(this.color).join(' ')} / 70%)`;
     this.brushContext2d.lineCap = 'square';
     this.brushContext2d.lineJoin = 'miter';
-    this.brushContext2d.filter = 'blur(10px)';
 
     if(this.memorizedDots[String(x)] && this.memorizedDots[String(y)]) {
       return;

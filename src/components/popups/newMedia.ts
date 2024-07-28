@@ -58,7 +58,7 @@ import {ButtonOptions} from '../button';
 import {IS_MOBILE} from '../../environment/userAgent';
 import ripple from '../ripple';
 import Icon from '../icon';
-import {ButtonMenuItemOptions, ButtonMenuItemOptionsVerifiable} from '../buttonMenu';
+import {ButtonMenuItemOptionsVerifiable} from '../buttonMenu';
 import {openMediaEditor} from '../mediaEditor';
 
 type SendFileParams = SendFileDetails & {
@@ -97,7 +97,7 @@ class PhotoButtons {
   };
 
   private buttons: ButtonMenuItemOptionsVerifiable[] = [{
-    icon: 'tools',
+    icon: 'ranges',
     text: 'EnablePhotoSpoiler',
     onClick: () => {
       this.editPhoto();
@@ -301,8 +301,6 @@ export default class PopupNewMedia extends PopupElement {
         fileDetails.photoButtons.createButtons();
         continue;
       }
-
-      console.log(fileDetails);
 
       fileDetails.photoButtons = new PhotoButtons({
         fileDetails,
@@ -1171,7 +1169,8 @@ export default class PopupNewMedia extends PopupElement {
       return;
     }
 
-    this.listenerSetter.add(document.body)('keydown', this.onKeyDown);
+    console.log('почини это')
+    // this.listenerSetter.add(document.body)('keydown', this.onKeyDown);
     animationIntersector.setOnlyOnePlayableGroup(this.animationGroup);
     this.addEventListener('close', () => {
       animationIntersector.setOnlyOnePlayableGroup();

@@ -202,12 +202,15 @@ async function pipeline(options = {}) {
 
     }
 
-    await page.waitForSelector(PAGE.FIRST_ICON_BOX);
-    await page.click(PAGE.SELECT_ALL_BUTTON);
-    logger('Uploaded and selected all new icons');
-    await page.click(PAGE.GENERATE_LINK);
-    await page.waitForSelector(PAGE.GLYPH_SET);
+    try{
+      await page.waitForSelector(PAGE.FIRST_ICON_BOX);
+      await page.click(PAGE.SELECT_ALL_BUTTON);
+      logger('Uploaded and selected all new icons');
+      await page.click(PAGE.GENERATE_LINK);
+      await page.waitForSelector(PAGE.GLYPH_SET);
+    } catch(err) {
 
+    }
     if(haveStrokes) try {
       await page.click(PAGE.STROKE_CONTINUE);
     } catch(err) {

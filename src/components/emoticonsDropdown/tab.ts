@@ -485,7 +485,6 @@ export default class EmoticonsTabC<Category extends StickersTabCategory<any, any
       managers: this.managers,
       intersectionObserverInit: this.emoticonsDropdown.intersectionOptions
     });
-
     const rendererLazyLoadQueue = superStickerRenderer.lazyLoadQueue;
     this.emoticonsDropdown.addLazyLoadQueueRepeat(
       rendererLazyLoadQueue,

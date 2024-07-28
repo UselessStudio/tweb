@@ -13,12 +13,18 @@ import ripple from '../ripple';
 import {brushItems, BrushSelector} from './brushItems';
 import StickersTab from './stickers/Stickers';
 import rootScope from '../../lib/rootScope';
-import {EmoticonsDropdown} from '../emoticonsDropdown';
+import {EmoticonsDropdown, EMOTICONSSTICKERGROUP} from '../emoticonsDropdown';
 import {PaintingInfo, PaintingLayer} from './brushItems';
+import {Document} from '../../layer';
+import SuperStickerRenderer from '../emoticonsDropdown/tabs/SuperStickerRenderer';
+import LazyLoadQueue from '../lazyLoadQueue';
+import {drawText} from './renderText';
+
 
 class Editor {
   workSpaceEditorElement: HTMLElement;
   editorElement: HTMLElement;
+  textsLayer: TextsLayer;
   mediaObjectUrl: string;
   image: HTMLImageElement;
   initialWidth: number;
@@ -30,6 +36,7 @@ class Editor {
     size: 20,
     color: '#ffffff'
   }
+  stickersLayer: StickersLayer
 
   constructor({
     editorElement
@@ -84,17 +91,29 @@ class Editor {
     this.workSpaceEditorElement.style.left = `${left}px`;
   }
 
+  public addSticker(sticker: Document.document) {
+    this.stickersLayer.addSticker(sticker);
+  }
+
+  public addText() {
+    this.textsLayer.addTextBlock();
+  }
+
   public init(url: string) {
     this.mediaObjectUrl = url;
     this.workSpaceEditorElement = document.createElement('div');
     this.workSpaceEditorElement.style.maxWidth = '100%';
     this.workSpaceEditorElement.style.maxHeight = '100%';
     this.workSpaceEditorElement.style.position = 'absolute';
+    this.workSpaceEditorElement.style.overflow = 'clip';
 
     this.editorElement.append(this.workSpaceEditorElement);
 
     this.image = document.createElement('img');
     this.image.src = url;
+
+    this.stickersLayer = new StickersLayer(this.workSpaceEditorElement);
+    this.textsLayer = new TextsLayer(this.workSpaceEditorElement);
 
     return new Promise((resolve) => {
       this.resizeObserver = new ResizeObserver(() => {
@@ -102,7 +121,7 @@ class Editor {
       });
 
       this.image.onload = () => {
-        this.image.style.position = 'absolute';
+        this.image.style.position = 'relative';
         this.image.style.left = '0px';
         this.image.style.top = '0px';
 
@@ -120,10 +139,39 @@ class Editor {
         this.initialHeight = this.image.height;
         this.initialWidth = this.image.width;
         this.workSpaceEditorElement.append(this.image);
+
         this.resize();
         resolve(this.workSpaceEditorElement);
       }
     })
+  }
+
+  public disableTextsLayer() {
+    if(!this.textsLayer) {
+      return;
+    }
+    this.textsLayer.disableLayer();
+  }
+
+  public enableTextsLayer() {
+    if(!this.textsLayer) {
+      return;
+    }
+    this.textsLayer.enableLayer();
+  }
+
+  public disableStickersLayer() {
+    if(!this.stickersLayer) {
+      return;
+    }
+    this.stickersLayer.disableLayer();
+  }
+
+  public enableStickersLayer() {
+    if(!this.stickersLayer) {
+      return;
+    }
+    this.stickersLayer.enableLayer();
   }
 
   public detachPaintingLayer() {
@@ -165,6 +213,10 @@ class Editor {
     const context = canvas.getContext('2d');
     context.drawImage(this.image, 0, 0, this.initialWidth, this.initialHeight);
     context.drawImage(this.paintingLayerCanvas, 0, 0, this.initialWidth, this.initialHeight);
+
+    this.stickersLayer.proccess(canvas);
+    await this.textsLayer.proccess(canvas);
+    console.log(canvas);
 
     return new Promise((resolve) => {
       canvas.toBlob((blob) => {
@@ -410,9 +462,16 @@ const useColorPicker = () => {
   }
 }
 
-const StickersController = () => {
+const StickersController = ({
+  setSticker
+}: {
+  setSticker?: (sticker: Document.document) => any
+}) => {
   let ref: HTMLDivElement;
-  const tab = new StickersTab(rootScope.managers);
+  const tab = new StickersTab({
+    managers: rootScope.managers,
+    onStickerClick: setSticker
+  });
   onMount(() => {
     tab.emoticonsDropdown = new EmoticonsDropdown({
       customParentElement: ref
@@ -423,7 +482,7 @@ const StickersController = () => {
   })
 
   return (
-    <div ref={ref} id={'element'} style={{'height': '100%', 'position': 'relative', 'overflow': 'hidden'}}>
+    <div ref={ref} class='media-editor-stickers' style={{'height': '100%', 'position': 'relative', 'overflow': 'hidden'}}>
       {tab.container}
     </div>
   )
@@ -681,17 +740,17 @@ const fonts = [
 const alignItems = [
   {
     value: 'left',
-    icon: () => <IconTsx icon={'tools'} />,
+    icon: () => <IconTsx style={{'font-size': '22px'}} icon={'align_left'} />,
     active: false
   },
   {
     value: 'center',
-    icon: () => <IconTsx icon={'tools'} />,
+    icon: () => <IconTsx style={{'font-size': '22px'}} icon={'align_centre'} />,
     active: false
   },
   {
     value: 'right',
-    icon: () => <IconTsx icon={'tools'} />,
+    icon: () => <IconTsx style={{'font-size': '22px'}} icon={'align_right'} />,
     active: false
   }
 ]
@@ -699,17 +758,17 @@ const alignItems = [
 const fontDecoration = [
   {
     value: 'color',
-    icon: () => <IconTsx icon={'tools'} />,
+    icon: () => <IconTsx icon={'text_fill_color'} />,
     active: false
   },
   {
     value: 'border',
-    icon: () => <IconTsx icon={'tools'} />,
+    icon: () => <IconTsx icon={'text_border_color'} />,
     active: false
   },
   {
     value: 'background',
-    icon: () => <IconTsx icon={'tools'} />,
+    icon: () => <IconTsx icon={'text_background_color'} />,
     active: false
   }
 ]
@@ -797,87 +856,87 @@ export const TextController = ({
   )
 }
 
-class Draggable {
-  isDragging: boolean;
-  target: HTMLElement;
+// class Draggable {
+//   isDragging: boolean;
+//   target: HTMLElement;
 
-  constructor(traget: ) {
+//   constructor(traget: ) {
 
-  }
+//   }
 
-  function startDragging() {
-    this.isDragging = true;
-  }
+//   function startDragging() {
+//     this.isDragging = true;
+//   }
 
-  function dragging() {
-    this.isDragging = true;
-  }
-}
+//   function dragging() {
+//     this.isDragging = true;
+//   }
+// }
 
 const aspectRatioItems = [
   {
     value: 'free',
-    icon: () => <IconTsx icon={'tools'}/>,
+    icon: () => <IconTsx icon={'aspect_ratio_free'}/>,
     active: false
   },
   {
     value: 'original',
-    icon: () => <IconTsx icon={'tools'}/>,
+    icon: () => <IconTsx icon={'aspect_ratio_original'}/>,
     active: false
   },
   {
     value: 'square',
-    icon: () => <IconTsx icon={'tools'}/>,
+    icon: () => <IconTsx icon={'aspect_ratio_square'}/>,
     active: false
   },
   {
     value: '3x2',
-    icon: () => <IconTsx icon={'tools'}/>,
+    icon: () => <IconTsx icon={'aspect_ratio_3x2'}/>,
     active: false
   },
   {
     value: '2x3',
-    icon: () => <IconTsx style={{transform: 'rotate(90deg)'}} icon={'tools'}/>,
+    icon: () => <IconTsx style={{transform: 'rotate(90deg)'}} icon={'aspect_ratio_3x2'}/>,
     active: false
   },
   {
     value: '4x3',
-    icon: () => <IconTsx icon={'tools'} />,
+    icon: () => <IconTsx icon={'aspect_ratio_4x3'} />,
     active: false
   },
   {
     value: '3x4',
-    icon: () => <IconTsx style={{transform: 'rotate(90deg)'}} icon={'tools'} />,
+    icon: () => <IconTsx style={{transform: 'rotate(90deg)'}} icon={'aspect_ratio_4x3'} />,
     active: false
   },
   {
     value: '5x4',
-    icon: () => <IconTsx icon={'tools'} />,
+    icon: () => <IconTsx icon={'aspect_ratio_5x4'} />,
     active: false
   },
   {
     value: '4x5',
-    icon: () => <IconTsx style={{transform: 'rotate(90deg)'}} icon={'tools'} />,
+    icon: () => <IconTsx style={{transform: 'rotate(90deg)'}} icon={'aspect_ratio_5x4'} />,
     active: false
   },
   {
     value: '7x5',
-    icon: () => <IconTsx icon={'tools'} />,
+    icon: () => <IconTsx icon={'aspect_ratio_7x5'} />,
     active: false
   },
   {
     value: '5x7',
-    icon: () => <IconTsx style={{transform: 'rotate(90deg)'}} icon={'tools'} />,
+    icon: () => <IconTsx style={{transform: 'rotate(90deg)'}} icon={'aspect_ratio_7x5'} />,
     active: false
   },
   {
     value: '16x9',
-    icon: () => <IconTsx icon={'tools'} />,
+    icon: () => <IconTsx icon={'aspect_ratio_16x9'} />,
     active: false
   },
   {
     value: '9x16',
-    icon: () => <IconTsx style={{transform: 'rotate(90deg)'}} icon={'tools'} />,
+    icon: () => <IconTsx style={{transform: 'rotate(90deg)'}} icon={'aspect_ratio_16x9'} />,
     active: false
   }
 ];
@@ -900,7 +959,7 @@ const ScreenAspectRatioController = () => {
         setAspectRatioItems(newBrushItems);
       }
     }
-  })
+  });
 
   return (
     <SimpleScrollableYTsx class={'media-editor-container-toolbar-section media-editor-container-toolbar-effects'}>
@@ -943,6 +1002,663 @@ const ScreenAspectRatioController = () => {
       </div>
     </SimpleScrollableYTsx>
   )
+}
+
+export const ResizerElement = () => {
+  return (
+    <div class='media-editor-resizable'>
+      <div class='resizers'>
+        <div class='resizer top-left'></div>
+        <div class='resizer top-right'></div>
+        <div class='resizer bottom-left'></div>
+        <div class='resizer bottom-right'></div>
+      </div>
+    </div>
+  )
+}
+
+export class Transformable {
+  attachTo: HTMLElement;
+  box: HTMLElement;
+  boxWrapper: HTMLElement;
+  rightMid: HTMLElement;
+  leftMid: HTMLElement;
+  topMid: HTMLElement;
+  bottomMid: HTMLElement;
+  leftTop: HTMLElement;
+  rightTop: HTMLElement;
+  rightBottom: HTMLElement;
+  leftBottom: HTMLElement;
+  rotateRightTop: HTMLElement;
+  rotateLeftTop: HTMLElement;
+  rotateRightBottom: HTMLElement;
+  rotateLeftBottom: HTMLElement;
+  resizableElement: HTMLElement;
+  boxContent: HTMLElement;
+
+  currentDegree: number = 0;
+  degreeOffset: number = 0;
+  degreeCenter = {x: 0, y: 0};
+
+  aspectRatio: number;
+  minWidth: number;
+  minHeight: number;
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+
+  initialWidth: number;
+  initialHeight: number;
+  initialLeft: number;
+  initialTop: number;
+  initialMinWidth: number;
+  initialMinHeight: number;
+
+  attachToInitialWidth: number;
+  attachToInitialHeight: number;
+
+  public onChange: (options?: {
+    left: number,
+    top: number,
+    width: number,
+    height: number,
+    rotate: number
+  }) => void;
+
+  private initElements() {
+    this.box = document.createElement('div');
+    this.boxWrapper = document.createElement('div');
+    this.boxWrapper.classList.add('media-editor-transformable-wrapper');
+    this.box.classList.add('media-editor-transformable-box');
+    this.box.style.position = 'absolute';
+    this.box.style.zIndex = '20';
+    this.box.style.display = 'flex';
+    this.boxWrapper.append(this.box);
+
+    this.rightMid = document.createElement('div');
+    this.rightMid.classList.add('media-editor-transformable-box-right-mid');
+    this.leftMid = document.createElement('div');
+    this.leftMid.classList.add('media-editor-transformable-box-left-mid');
+    this.topMid = document.createElement('div');
+    this.topMid.classList.add('media-editor-transformable-box-top-mid');
+    this.bottomMid = document.createElement('div');
+    this.bottomMid.classList.add('media-editor-transformable-box-bottom-mid');
+
+    this.leftTop = document.createElement('div');
+    this.leftTop.classList.add('media-editor-transformable-box-left-top');
+    this.rightTop = document.createElement('div');
+    this.rightTop.classList.add('media-editor-transformable-box-right-top');
+    this.rightBottom = document.createElement('div');
+    this.rightBottom.classList.add('media-editor-transformable-box-right-bottom');
+    this.leftBottom = document.createElement('div');
+    this.leftBottom.classList.add('media-editor-transformable-box-left-bottom');
+
+    this.rotateRightTop = document.createElement('div');
+    this.rotateRightTop.classList.add('media-editor-transformable-box-rotate-right-top');
+    this.rotateLeftTop = document.createElement('div');
+    this.rotateLeftTop.classList.add('media-editor-transformable-box-rotate-left-top');
+    this.rotateRightBottom = document.createElement('div');
+    this.rotateRightBottom.classList.add('media-editor-transformable-box-rotate-right-bottom');
+    this.rotateLeftBottom = document.createElement('div');
+    this.rotateLeftBottom.classList.add('media-editor-transformable-box-rotate-left-bottom');
+
+    this.resizableElement = document.createElement('div');
+    this.resizableElement.classList.add('media-editor-transformable-box-resize');
+
+    this.boxContent = document.createElement('div');
+    this.boxContent.classList.add('media-editor-transformable-box-content');
+
+    this.box.append(
+      this.resizableElement,
+      this.rotateRightTop,
+      this.rotateLeftTop,
+      this.rotateRightBottom,
+      this.rotateLeftBottom,
+      this.leftTop,
+      this.rightTop,
+      this.rightBottom,
+      this.leftBottom,
+      this.boxContent
+    );
+  }
+
+  public disable() {
+    this.resizableElement.style.display = 'none';
+    this.leftTop.style.display = 'none';
+    this.rightTop.style.display = 'none';
+    this.rightBottom.style.display = 'none';
+    this.leftBottom.style.display = 'none';
+    this.boxWrapper.style.pointerEvents = 'none';
+  }
+
+  public enable() {
+    this.resizableElement.style.display = 'flex';
+    this.leftTop.style.display = 'unset';
+    this.rightTop.style.display = 'unset';
+    this.rightBottom.style.display = 'unset';
+    this.leftBottom.style.display = 'unset';
+    this.boxWrapper.style.pointerEvents = 'unset';
+  }
+
+  private rotation(event: MouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const angle = Math.atan2(event.clientY - this.degreeCenter.y, event.clientX - this.degreeCenter.x) + Math.PI / 2;
+
+    this.currentDegree = angle * 180 / Math.PI - this.degreeOffset;
+    this.boxWrapper.style.transform = `rotate(${this.currentDegree}deg)`;
+  }
+
+  public getCurrnetTransform() {
+    function getCurrentRotation(el: HTMLElement) {
+      var st = window.getComputedStyle(el, null);
+      var tm = st.getPropertyValue('-webkit-transform') ||
+            st.getPropertyValue('-moz-transform') ||
+            st.getPropertyValue('-ms-transform') ||
+            st.getPropertyValue('-o-transform') ||
+            st.getPropertyValue('transform')
+      'none';
+      if(tm != 'none') {
+        var values = tm.split('(')[1].split(')')[0].split(',');
+        var angle = Math.round(Math.atan2(+values[1], +values[0]) * (180 / Math.PI));
+        return (angle < 0 ? angle + 360 : angle);
+      }
+      return 0;
+    }
+    const attachToBox = this.attachTo.getBoundingClientRect();
+
+    return {
+      left: +this.boxWrapper.style.left.replace('px', ''),
+      top: +this.boxWrapper.style.top.replace('px', ''),
+      width: this.boxContent.clientWidth,
+      height: this.boxContent.clientHeight,
+      rotation: getCurrentRotation(this.boxWrapper),
+      containerWidth: attachToBox.width,
+      containerHeight: attachToBox.height
+    }
+  }
+
+  public init({
+    attachTo,
+    children,
+    options
+  }: {
+    attachTo: HTMLElement,
+    children: HTMLElement,
+    offsetX?: number,
+    offsetY?: number,
+    options?: {
+      minWidth: number;
+      minHeight: number;
+      width: number,
+      height: number,
+      left: number,
+      top: number,
+      aspectRatio?: number
+    }
+  }) {
+    const {
+      minWidth = 200,
+      minHeight = 200,
+      width = 200,
+      height = 200,
+      left = attachTo?.clientLeft + attachTo?.clientWidth / 2,
+      top = attachTo?.clientTop + attachTo?.clientHeight / 2,
+      aspectRatio
+    } = options || {};
+
+    this.aspectRatio = aspectRatio;
+    this.minWidth = this.initialMinWidth = minWidth;
+    this.minHeight = this.initialMinHeight = minHeight;
+    this.initialWidth = width;
+    this.initialHeight = height;
+    this.initialLeft = left;
+    this.initialTop = top;
+
+    this.attachToInitialHeight = attachTo?.getBoundingClientRect().height;
+    this.attachToInitialWidth = attachTo?.getBoundingClientRect().width;
+
+    this.initElements();
+
+    let initX: number;
+    let initY: number;
+    let mousePressX: number;
+    let mousePressY: number;
+    let initW: number;
+    let initH: number;
+    let initRotate: number;
+
+    this.attachTo = attachTo;
+    this.attachTo.append(this.boxWrapper);
+    this.boxContent.append(children);
+
+    const repositionElement = (x: number, y: number, save = true) => {
+      this.boxWrapper.style.left = x + 'px';
+      this.boxWrapper.style.top = y + 'px';
+
+      if(save) {
+        this.x = x;
+        this.y = y;
+      }
+    }
+
+    const resize = (w: number, h: number, save: boolean = true) => {
+      this.box.style.width = (this.aspectRatio ? h * this.aspectRatio : w) + 'px';
+      this.box.style.height = h + 'px';
+
+      if(save) {
+        this.width = (this.aspectRatio ? h * this.aspectRatio : w);
+        this.height = h;
+      }
+
+      this.resizableElement.style.backgroundImage = `url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='${(this.aspectRatio ? h * this.aspectRatio : w) + 8}' height='${h + 8}' x='2' y='2' fill='none' stroke='hsla(0, 0%, 100%, 0.2)' stroke-width='2' stroke-dasharray='6%2c 14' stroke-dashoffset='0' stroke-linecap='round'/%3e%3c/svg%3e")`;
+    }
+
+    function getCurrentRotation(el: HTMLElement) {
+      var st = window.getComputedStyle(el, null);
+      var tm = st.getPropertyValue('-webkit-transform') ||
+            st.getPropertyValue('-moz-transform') ||
+            st.getPropertyValue('-ms-transform') ||
+            st.getPropertyValue('-o-transform') ||
+            st.getPropertyValue('transform')
+      'none';
+      if(tm != 'none') {
+        var values = tm.split('(')[1].split(')')[0].split(',');
+        var angle = Math.round(Math.atan2(+values[1], +values[0]) * (180 / Math.PI));
+        return (angle < 0 ? angle + 360 : angle);
+      }
+      return 0;
+    }
+
+    this.boxWrapper.addEventListener('mousedown', (event: MouseEvent) => {
+      if((event.target as HTMLElement).className.indexOf('dot') > -1) {
+        return;
+      }
+
+      initX = this.boxWrapper.offsetLeft;
+      initY = this.boxWrapper.offsetTop;
+      mousePressX = event.x;
+      mousePressY = event.y;
+
+      function eventMoveHandler(event: MouseEvent) {
+        repositionElement(initX + (event.clientX - mousePressX),
+          initY + (event.clientY - mousePressY));
+      }
+
+      const onMouseUp = () => {
+        document.removeEventListener('mousemove', eventMoveHandler, false);
+        document.removeEventListener('mouseup', onMouseUp);
+      }
+
+      document.addEventListener('mousemove', eventMoveHandler, false);
+      document.addEventListener('mouseup', onMouseUp, false);
+    }, false);
+
+    var rightMid = this.rightMid;
+    var leftMid = this.leftMid;
+    var topMid = this.topMid;
+    var bottomMid = this.bottomMid;
+
+    var leftTop = this.leftTop;
+    var rightTop = this.rightTop;
+    var rightBottom = this.rightBottom;
+    var leftBottom = this.leftBottom;
+
+    const resizeObserver = new ResizeObserver((() => {
+      const attachToBox = this.attachTo.getBoundingClientRect();
+
+      const deltaWidth = attachToBox.width / this.attachToInitialWidth;
+      const deltaHeight = attachToBox.height / this.attachToInitialHeight;
+      this.minHeight = this.initialMinHeight * deltaHeight;
+      this.minWidth = this.initialMinWidth * deltaWidth;
+
+      repositionElement(this.x * deltaWidth, this.y * deltaHeight, false)
+      resize(this.width * deltaWidth, this.height * deltaHeight, false);
+    }).bind(this));
+    resizeObserver.observe(this.attachTo);
+
+    const resizeHandler = (event: MouseEvent, left = false, top = false, xResize = false, yResize = false) => {
+      initX = (event.target as HTMLElement).offsetLeft;
+      initY = (event.target as HTMLElement).offsetTop;
+      mousePressX = event.clientX;
+      mousePressY = event.clientY;
+
+      initW = this.box.offsetWidth;
+      initH = this.box.offsetHeight;
+
+      initRotate = getCurrentRotation(this.boxWrapper);
+      var initRadians = initRotate * Math.PI / 180;
+      var cosFraction = Math.cos(initRadians);
+      var sinFraction = Math.sin(initRadians);
+      const eventMoveHandler = (event: MouseEvent) => {
+        var hDiff = (event.clientY - mousePressY);
+        var wDiff = (event.clientX - mousePressX);
+
+        var rotatedWDiff = cosFraction * wDiff + sinFraction * hDiff;
+        var rotatedHDiff = cosFraction * hDiff - sinFraction * wDiff;
+
+        var newW = initW, newH = initH, newX = initX, newY = initY;
+
+        if(yResize) {
+          if(top) {
+            newH = initH - rotatedHDiff;
+            if(newH < this.minHeight) {
+              newH = this.minHeight;
+              rotatedHDiff = initH - this.minHeight;
+            }
+          } else {
+            newH = initH + rotatedHDiff;
+            if(newH < this.minHeight) {
+              newH = this.minHeight;
+              rotatedHDiff = this.minHeight - initH;
+            }
+          }
+          newX -= 0.5 * rotatedHDiff * sinFraction;
+          newY += 0.5 * rotatedHDiff * cosFraction;
+        }
+
+        if(xResize) {
+          if(left) {
+            newW = initW - rotatedWDiff;
+
+            if(this.aspectRatio) {
+              newW = this.aspectRatio * newH;
+              rotatedWDiff = initW - newW;
+            } else if(newW < this.minWidth) {
+              newW = this.minWidth;
+              rotatedWDiff = initW - this.minWidth;
+            }
+          } else {
+            newW = initW + rotatedWDiff;
+
+            if(this.aspectRatio) {
+              newW = this.aspectRatio * newH;
+              rotatedWDiff = newW - initW;
+            } else if(newW < this.minWidth) {
+              newW = this.minWidth;
+              rotatedWDiff = this.minWidth - initW;
+            }
+          }
+          newX += 0.5 * rotatedWDiff * cosFraction;
+          newY += 0.5 * rotatedWDiff * sinFraction;
+        }
+
+        resize(newW, newH);
+        repositionElement(newX, newY);
+      }
+
+      window.addEventListener('mousemove', eventMoveHandler, false);
+      window.addEventListener('mouseup', function eventEndHandler() {
+        window.removeEventListener('mousemove', eventMoveHandler, false);
+        window.removeEventListener('mouseup', eventEndHandler);
+      }, false);
+    }
+
+
+    rightMid.addEventListener('mousedown', e => resizeHandler(e, false, false, true, false));
+    leftMid.addEventListener('mousedown', e => resizeHandler(e, true, false, true, false));
+    topMid.addEventListener('mousedown', e => resizeHandler(e, false, true, false, true));
+    bottomMid.addEventListener('mousedown', e => resizeHandler(e, false, false, false, true));
+    leftTop.addEventListener('mousedown', e => resizeHandler(e, true, true, true, true));
+    rightTop.addEventListener('mousedown', e => resizeHandler(e, false, true, true, true));
+    rightBottom.addEventListener('mousedown', e => resizeHandler(e, false, false, true, true));
+    leftBottom.addEventListener('mousedown', e => resizeHandler(e, true, false, true, true));
+
+    [this.rotateRightTop, this.rotateLeftBottom, this.rotateRightBottom, this.rotateLeftTop].map((element) => {
+      element.addEventListener('mousedown', (event) => {
+        event.stopPropagation();
+
+        initX = this.rotateRightTop.offsetLeft;
+        initY = this.rotateRightTop.offsetTop;
+        mousePressX = event.clientX;
+        mousePressY = event.clientY;
+
+        var arrow = this.box;
+        var arrowRects = arrow.getBoundingClientRect();
+        var arrowX = arrowRects.left + arrowRects.width / 2;
+        var arrowY = arrowRects.top + arrowRects.height / 2;
+
+        this.degreeCenter = {x: arrowX, y: arrowY}
+        this.degreeOffset = (Math.atan2(event.clientY - this.degreeCenter.y, event.clientX - this.degreeCenter.x) + Math.PI / 2) * 180 / Math.PI - this.currentDegree;
+
+        const rotation = this.rotation.bind(this);
+
+        const eventEndHandler =() => {
+          window.removeEventListener('mousemove', rotation, false);
+          window.removeEventListener('mouseup', eventEndHandler);
+        }
+
+        window.addEventListener('mousemove', rotation, false);
+        window.addEventListener('mouseup', eventEndHandler, false);
+      }, false);
+    })
+
+    resize(this.initialMinWidth, this.initialMinHeight);
+    repositionElement(this.initialLeft, this.initialTop);
+  }
+}
+
+class TextsLayer {
+  appendTo: HTMLElement;
+  textBlocks: Array<{
+    transformable: Transformable,
+    textBlock: HTMLElement
+  }>
+  attachTo: HTMLElement;
+  target: HTMLElement;
+  textarea: HTMLTextAreaElement;
+
+  constructor(attachTo: HTMLElement) {
+    this.attachTo = attachTo;
+    this.target = document.createElement('div');
+    this.target.style.position = 'absolute';
+    this.target.style.width = '100%';
+    this.target.style.height = '100%';
+    this.target.style.zIndex = '15';
+    this.textBlocks = [];
+    this.attachTo.append(this.target);
+    this.disableLayer();
+  }
+
+  public setTextBlockStyle(options: {
+    textAlign: string,
+    color: string,
+    size: number,
+    fontFamily: string
+  }) {
+    this.target.style.textAlign = 'center';
+    this.target.style.color = 'white';
+    this.target.style.fontSize = 'center';
+    this.target.style.fontFamily = 'Roboto';
+  }
+
+  public addTextBlock() {
+    const textBlock = document.createElement('textarea');
+    textBlock.style.minWidth = '100%';
+    textBlock.style.minHeight = '100%';
+    textBlock.style.zIndex = '10';
+    textBlock.classList.add('media-editor-textblock');
+    textBlock.oninput = (e) => e.stopPropagation();
+    this.textarea = textBlock;
+
+    const transformable = new Transformable();
+    transformable.init({
+      attachTo: this.target,
+      children: textBlock,
+      options: {
+        minHeight: 40,
+        minWidth: 200,
+        width: 40,
+        height: 20,
+        left: this.target?.clientLeft + this.target?.clientWidth / 2,
+        top: this.target?.clientTop + this.target?.clientHeight / 2
+      }
+    });
+    transformable.boxContent.style.padding = '8px'
+
+    this.textBlocks.push({
+      textBlock,
+      transformable
+    });
+  }
+
+  public async proccess(canvas: HTMLCanvasElement) {
+    if(!this.textBlocks.length) {
+      return;
+    }
+
+    const context = canvas.getContext('2d');
+
+    const canvasWidth = canvas.width;
+    const canvasHeight = canvas.height;
+    const attachToWidth = this.attachTo.getBoundingClientRect().width;
+    const attachToHeight = this.attachTo.getBoundingClientRect().height;
+
+    const deltaWidth = canvasWidth / attachToWidth;
+    const deltaHeight = canvasHeight / attachToHeight;
+
+    for(const textBlock of this.textBlocks) {
+      const {width, height, left, top, rotation} = textBlock.transformable.getCurrnetTransform();
+
+      const {canvas} = drawText({
+        fontName: 'arial',
+        width: width,
+        text: this.textarea.value,
+        fontSize: 18
+      });
+
+      const targetWidth = canvas.width * deltaWidth;
+      const targetHeight = canvas.height / 2 * deltaHeight;
+
+      const targetLeft = left * deltaWidth - targetWidth / 2;
+      const targetTop = top * deltaHeight - targetHeight / 2;
+
+      context.save();
+      context.translate(targetLeft + targetWidth / 2, targetTop + targetHeight / 2);
+      context.rotate(rotation * (Math.PI / 180));
+      context.translate(- targetLeft - targetWidth / 2, - targetTop - targetHeight / 2);
+      context.drawImage(canvas, targetLeft, targetTop, targetWidth, targetHeight);
+      context.restore();
+    }
+  }
+
+  public disableLayer() {
+    this.textBlocks.forEach(el => el.transformable.disable());
+    this.target.style.pointerEvents = 'none';
+  }
+
+  public enableLayer() {
+    this.textBlocks.forEach(el => el.transformable.enable());
+    this.target.style.pointerEvents = 'unset';
+  }
+}
+
+class StickersLayer {
+  appendTo: HTMLElement;
+  stickers: Array<{
+    sticker: Document.document,
+    transformable: Transformable,
+    stickerEl: HTMLElement
+  }>
+  attachTo: HTMLElement;
+  target: HTMLElement;
+  stickerRenderer: SuperStickerRenderer;
+
+  constructor(attachTo: HTMLElement) {
+    this.stickers = [];
+    this.attachTo = attachTo;
+    this.target = document.createElement('div');
+    this.target.style.position = 'absolute';
+    this.target.style.width = '100%';
+    this.target.style.height = '100%';
+    this.target.style.zIndex = '20';
+    this.attachTo.append(this.target);
+    this.stickerRenderer = new SuperStickerRenderer({
+      managers: rootScope.managers,
+      group: EMOTICONSSTICKERGROUP,
+      regularLazyLoadQueue: new LazyLoadQueue(1),
+      visibleRenderOptions: {
+        width: 250,
+        height: 250
+      }
+    });
+    this.disableLayer();
+  }
+
+  public addSticker(sticker: Document.document) {
+    const container = document.createElement('div');
+    container.style.width = '100%';
+    container.style.height = '100%';
+    const transformable = new Transformable();
+    transformable.init({
+      attachTo: this.target,
+      children: container,
+      options: {
+        minHeight: 200,
+        minWidth: 200,
+        width: 300,
+        height: 300,
+        left: this.target?.clientLeft + this.target?.clientWidth / 2,
+        top: this.target?.clientTop + this.target?.clientHeight / 2,
+        aspectRatio: 1
+      }
+    });
+
+    const stickerEl = this.stickerRenderer.renderSticker(sticker);
+    container.append(stickerEl);
+
+    this.stickers.push({
+      sticker: sticker,
+      transformable,
+      stickerEl
+    });
+  }
+
+  public proccess(canvas: HTMLCanvasElement) {
+    if(!this.stickers.length) {
+      return;
+    }
+
+    const context = canvas.getContext('2d');
+
+    const canvasWidth = canvas.width;
+    const canvasHeight = canvas.height;
+    const attachToWidth = this.attachTo.getBoundingClientRect().width;
+    const attachToHeight = this.attachTo.getBoundingClientRect().height;
+
+    const deltaWidth = canvasWidth / attachToWidth;
+    const deltaHeight = canvasHeight / attachToHeight;
+
+    this.stickers.forEach((sticker) => {
+      const {width, height, left, top, rotation} = sticker.transformable.getCurrnetTransform();
+      const img = sticker.stickerEl.children[0] as HTMLCanvasElement | HTMLImageElement;
+
+      const targetWidth = width * deltaWidth;
+      const targetHeight = height * deltaHeight;
+
+      const targetLeft = left * deltaWidth - targetWidth / 2;
+      const targetTop = top * deltaHeight - targetHeight / 2;
+
+      context.save();
+      context.translate(targetLeft + targetWidth / 2, targetTop + targetHeight / 2);
+      context.rotate(rotation * (Math.PI / 180));
+      context.translate(- targetLeft - targetWidth / 2, - targetTop - targetHeight / 2);
+      context.drawImage(img, targetLeft, targetTop, targetWidth, targetHeight);
+      context.restore();
+    })
+  }
+
+  public disableLayer() {
+    this.stickers.forEach(el => el.transformable.disable());
+    this.target.style.pointerEvents = 'none';
+  }
+
+  public enableLayer() {
+    this.stickers.forEach(el => el.transformable.enable());
+    this.target.style.pointerEvents = 'unset';
+  }
 }
 
 export const MediaEditor = ({
@@ -990,9 +1706,30 @@ export const MediaEditor = ({
     })
   })
 
+  createEffect(() => {
+    if(tab() === 4) {
+      editor.enableStickersLayer();
+    } else {
+      editor.disableStickersLayer();
+    }
+  })
+
+  createEffect(() => {
+    if(tab() === 2) {
+      editor.enableTextsLayer();
+      editor.addText();
+    } else {
+      editor.disableTextsLayer();
+    }
+  });
+
   const onProcess = async() => {
     const blob = await editor.process();
     close(blob);
+  }
+
+  const onAddSticker = (sticker: Document.document) => {
+    editor.addSticker(sticker);
   }
 
   return (
@@ -1014,10 +1751,10 @@ export const MediaEditor = ({
           </div>
           <div class={'media-editor-container-toolbar-header-nav-btns'}>
             <button class={'btn-icon'}>
-              <IconTsx icon={'rotate_left'}/>
+              <IconTsx icon={'undo'}/>
             </button>
             <button class={'btn-icon'}>
-              <IconTsx icon={'rotate_right'}/>
+              <IconTsx icon={'redo'}/>
             </button>
           </div>
         </div>
@@ -1026,10 +1763,10 @@ export const MediaEditor = ({
           onChange={setTab}
           class="media-editor-container-toolbar"
           menu={[
-            <IconTsx icon={'tools'} class={'btn-icon'}/>,
-            <IconTsx icon={'fullscreen'} class={'btn-icon'}/>,
-            <IconTsx icon={'textedit'} class={'btn-icon'}/>,
-            <IconTsx icon={'edit'} class={'btn-icon'}/>,
+            <IconTsx icon={'ranges'} class={'btn-icon'}/>,
+            <IconTsx icon={'crop'} class={'btn-icon'}/>,
+            <IconTsx icon={'text'} class={'btn-icon'}/>,
+            <IconTsx icon={'brush'} class={'btn-icon'}/>,
             <IconTsx icon={'smile'} class={'btn-icon'}/>
           ]}
           content={[
@@ -1047,12 +1784,12 @@ export const MediaEditor = ({
               getBrashSize={getBrashSize}
               setBrashSize={setBrashSize}
             />,
-            <> {tab() === 4 && <StickersController />} </>
+            <> {tab() === 4 && <StickersController setSticker={onAddSticker} />} </>
           ]}
         />
       </div>
       <button onClick={onProcess} class="btn-circle media-editor-container-done-btn">
-        <IconTsx icon={'rotate_right'}/>
+        <IconTsx icon={'check'}/>
       </button>
     </div>
   )

@@ -9,10 +9,6 @@ import rootScope from '../../../lib/rootScope';
 import {putPreloader} from '../../putPreloader';
 import PopupStickers from '../../popups/stickers';
 import findAndSplice from '../../../helpers/array/findAndSplice';
-import {attachClickEvent} from '../../../helpers/dom/clickEvent';
-import noop from '../../../helpers/noop';
-import ButtonIcon from '../../buttonIcon';
-import confirmationPopup from '../../confirmationPopup';
 import VisibilityIntersector, {OnVisibilityChangeItem} from '../../visibilityIntersector';
 import findUpAsChild from '../../../helpers/dom/findUpAsChild';
 import forEachReverse from '../../../helpers/array/forEachReverse';
@@ -24,13 +20,21 @@ import {i18n} from '../../../lib/langPack';
 import {onCleanup} from 'solid-js';
 import SuperStickerRenderer from '../../emoticonsDropdown/tabs/SuperStickerRenderer';
 import {EmoticonsDropdown, EMOTICONSSTICKERGROUP} from '../../emoticonsDropdown';
+import findUpTag from '../../../helpers/dom/findUpTag';
 
 
 type StickersTabItem = {element: HTMLElement, document: Document.document};
 export default class StickersTab extends EmoticonsTabC<StickersTabCategory<StickersTabItem>, Document.document[]> {
   private stickerRenderer: SuperStickerRenderer;
+  private onStickerClick: (document: Document.document) => void;
 
-  constructor(managers: AppManagers) {
+  constructor({
+    managers,
+    onStickerClick
+  }: {
+    managers: AppManagers,
+    onStickerClick?: (document: Document.document) => void
+  }) {
     super({
       managers,
       searchFetcher: async(value) => {
@@ -88,6 +92,9 @@ export default class StickersTab extends EmoticonsTabC<StickersTabCategory<Stick
       searchType: 'stickers'
     });
 
+    if(onStickerClick) {
+      this.onStickerClick = onStickerClick.bind(this);
+    }
     this.container.classList.add('stickers-padding');
     this.content.id = 'content-stickers-media-editor';
   }
@@ -151,9 +158,11 @@ export default class StickersTab extends EmoticonsTabC<StickersTabCategory<Stick
 
     this.categoriesIntersector = new VisibilityIntersector(this.onCategoryVisibility, {root: document.getElementById('element')});
 
-    this.scrollable.container.addEventListener('click', (e) => {
-      const target = e.target as HTMLElement;
-      if(findUpClassName(target, 'category-title')) {
+    this.scrollable.container.addEventListener('click', async(e) => {
+      const target = findUpTag(e.target as HTMLElement, 'DIV');
+
+      if(findUpClassName(e.target, 'category-title')) {
+        console.log(findUpClassName(target, 'category-title'));
         const container = findUpClassName(target, 'emoji-category');
         const category = this.categoriesMap.get(container);
         if(category.local) {
@@ -162,6 +171,14 @@ export default class StickersTab extends EmoticonsTabC<StickersTabCategory<Stick
 
         PopupElement.createPopup(PopupStickers, {id: category.set.id, access_hash: category.set.access_hash}, false, this.emoticonsDropdown.chatInput).show();
         return;
+      }
+
+
+      if(!target?.dataset?.docId) {
+        return;
+      }
+      if(this.onStickerClick) {
+        this.onStickerClick(await this.managers.appDocsManager.getDoc(target?.dataset?.docId));
       }
     });
 
@@ -199,7 +216,6 @@ export default class StickersTab extends EmoticonsTabC<StickersTabCategory<Stick
       icon: 'savedmessages',
       styles: EmoticonsTabStyles.Stickers
     });
-    // favedCategory.elements.menuTab.classList.add('active');
 
     const recentCategory = this.createLocalCategory({
       id: 'recent',
@@ -209,26 +225,13 @@ export default class StickersTab extends EmoticonsTabC<StickersTabCategory<Stick
     });
     recentCategory.limit = 20;
 
-    const clearButton = ButtonIcon('close', {noRipple: true});
-    recentCategory.elements.title.append(clearButton);
-    attachClickEvent(clearButton, () => {
-      confirmationPopup({
-        titleLangKey: 'ClearRecentStickersAlertTitle',
-        descriptionLangKey: 'ClearRecentStickersAlertMessage',
-        button: {
-          langKey: 'Clear'
-        }
-      }).then(() => {
-        this.managers.appStickersManager.clearRecentStickers();
-      }, noop);
-    });
-
     const promises = [
       Promise.all([
         this.managers.apiManager.getLimit('favedStickers'),
         this.managers.appStickersManager.getFavedStickersStickers()
       ]).then(([limit, stickers]) => {
         this.setFavedLimit(limit);
+        console.log(stickers);
         onCategoryStickers(favedCategory, stickers);
       }),
 
