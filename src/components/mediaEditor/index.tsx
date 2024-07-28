@@ -258,7 +258,6 @@ class Editor {
 
     this.stickersLayer.proccess(canvas);
     await this.textsLayer.proccess(canvas);
-    console.log(canvas);
 
     return new Promise((resolve) => {
       canvas.toBlob((blob) => {
@@ -1613,7 +1612,6 @@ class TextsLayer {
 
     newTarget.transformable.enableHighlight()
     if(this.onTargetBlockSet) {
-      console.log(newTarget.state);
       this.onTargetBlockSet({
         transformable: newTarget.transformable,
         state: newTarget.state,

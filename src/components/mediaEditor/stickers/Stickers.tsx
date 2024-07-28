@@ -162,7 +162,6 @@ export default class StickersTab extends EmoticonsTabC<StickersTabCategory<Stick
       const target = findUpTag(e.target as HTMLElement, 'DIV');
 
       if(findUpClassName(e.target, 'category-title')) {
-        console.log(findUpClassName(target, 'category-title'));
         const container = findUpClassName(target, 'emoji-category');
         const category = this.categoriesMap.get(container);
         if(category.local) {
@@ -231,7 +230,6 @@ export default class StickersTab extends EmoticonsTabC<StickersTabCategory<Stick
         this.managers.appStickersManager.getFavedStickersStickers()
       ]).then(([limit, stickers]) => {
         this.setFavedLimit(limit);
-        console.log(stickers);
         onCategoryStickers(favedCategory, stickers);
       }),
 

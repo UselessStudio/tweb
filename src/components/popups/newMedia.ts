@@ -796,7 +796,6 @@ export default class PopupNewMedia extends PopupElement {
 
   public changeSpoilers(toggle: boolean) {
     this.partition().media.forEach((item) => {
-      console.log(toggle && !item.mediaSpoiler);
       if(item.photoButtons) {
         item.photoButtons.updateSpoilers(toggle && !item.mediaSpoiler, true);
       }
@@ -1235,7 +1234,6 @@ export default class PopupNewMedia extends PopupElement {
       return;
     }
 
-    console.log('почини это')
     this.listenerSetter.add(document.body)('keydown', this.onKeyDown);
     animationIntersector.setOnlyOnePlayableGroup(this.animationGroup);
     this.addEventListener('close', () => {
