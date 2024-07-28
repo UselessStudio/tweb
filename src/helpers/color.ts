@@ -248,7 +248,7 @@ export function changeColorAccent(baseHsv: number[], accentHsv: number[], color:
 }
 
 export function changeBrightness(color: ColorRgb, amount: number) {
-  return color.map((v) => clamp(Math.round(v * amount), 0, 255)) as ColorRgb;
+  return color.map((v) => clamp(Math.round((v || 1) * amount), 0, 255)) as ColorRgb;
 }
 
 export function getHexColorFromTelegramColor(color: number) {

@@ -1,3 +1,14 @@
+"MediaEditorRangeItemEnhance" = "Enhance";
+"MediaEditorRangeItemBrightness" = "Brightness";
+"MediaEditorRangeItemContrast" = "Contrast";
+"MediaEditorRangeItemSaturation" = "Saturation";
+"MediaEditorRangeItemWarmth" = "Warmth";
+"MediaEditorRangeItemFade" = "Fade";
+"MediaEditorRangeItemHighlights" = "Highlights";
+"MediaEditorRangeItemShadows" = "Shadows";
+"MediaEditorRangeItemVignette" = "Vignette";
+"MediaEditorRangeItemGrain" = "Grain";
+"MediaEditorRangeItemSharpen" = "Sharpen";
 "Animations" = "Animations";
 "AttachAlbum" = "Album";
 "Appearance.Color.Hex" = "HEX";
