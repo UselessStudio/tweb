@@ -19,6 +19,8 @@ import {Document} from '../../layer';
 import SuperStickerRenderer from '../emoticonsDropdown/tabs/SuperStickerRenderer';
 import LazyLoadQueue from '../lazyLoadQueue';
 import {drawText} from './renderText';
+import {applyBrightnessContrast} from './effects/applyBrightnessContrast';
+import {applySaturation} from './effects/applySaturation';
 
 
 class Editor {
@@ -27,6 +29,7 @@ class Editor {
   textsLayer: TextsLayer;
   mediaObjectUrl: string;
   image: HTMLImageElement;
+  effectsCanvas: HTMLCanvasElement;
   initialWidth: number;
   initialHeight: number;
   resizeObserver: ResizeObserver;
@@ -37,6 +40,7 @@ class Editor {
     color: '#ffffff'
   }
   stickersLayer: StickersLayer
+  effects: MediaEditorEffects = getDefaultEffects();
 
   constructor({
     editorElement
@@ -109,6 +113,8 @@ class Editor {
 
     this.editorElement.append(this.workSpaceEditorElement);
 
+    this.effectsCanvas = document.createElement('canvas');
+
     this.image = document.createElement('img');
     this.image.src = url;
 
@@ -121,9 +127,9 @@ class Editor {
       });
 
       this.image.onload = () => {
-        this.image.style.position = 'relative';
-        this.image.style.left = '0px';
-        this.image.style.top = '0px';
+        this.effectsCanvas.style.position = 'relative';
+        this.effectsCanvas.style.left = '0px';
+        this.effectsCanvas.style.top = '0px';
 
         this.paintingLayerCanvas.style.position = 'absolute';
         this.paintingLayerCanvas.style.left = this.paintingLayerCanvas.style.left = '0px';
@@ -138,9 +144,11 @@ class Editor {
         this.resizeObserver.observe(this.editorElement);
         this.initialHeight = this.image.height;
         this.initialWidth = this.image.width;
-        this.workSpaceEditorElement.append(this.image);
+        this.workSpaceEditorElement.append(this.effectsCanvas);
 
         this.resize();
+
+        this.redrawEffects();
         resolve(this.workSpaceEditorElement);
       }
     })
@@ -186,8 +194,22 @@ class Editor {
 
     paintingLayer.attach({
       canvas: this.paintingLayerCanvas,
-      renderedElement: this.image
+      renderedElement: this.effectsCanvas
     });
+  }
+
+  public setEffects(effects: MediaEditorEffects) {
+    this.effects = effects;
+    this.redrawEffects();
+  }
+
+  private redrawEffects() {
+    this.effectsCanvas.width = this.image.width;
+    this.effectsCanvas.height = this.image.height;
+    const ctx = this.effectsCanvas.getContext('2d');
+    ctx.drawImage(this.image, 0, 0);
+    applyBrightnessContrast(ctx, this.effects.brightness, this.effects.contrast);
+    applySaturation(ctx, this.effects.saturation);
   }
 
   public setPaintingInfo({size, color}: PaintingInfo) {
@@ -211,7 +233,7 @@ class Editor {
     canvas.height = this.initialHeight;
 
     const context = canvas.getContext('2d');
-    context.drawImage(this.image, 0, 0, this.initialWidth, this.initialHeight);
+    context.drawImage(this.effectsCanvas, 0, 0, this.initialWidth, this.initialHeight);
     context.drawImage(this.paintingLayerCanvas, 0, 0, this.initialWidth, this.initialHeight);
 
     this.stickersLayer.proccess(canvas);
@@ -521,33 +543,33 @@ const effectsDefault: EffectDefault[] = [
   },
   {
     value: 'brightness',
-    min: 0,
+    min: -100,
     max: 100,
-    default: 50,
+    default: 0,
     fillFromMiddle: true,
     step: 1
   },
   {
     value: 'contrast',
-    min: 0,
+    min: -100,
     max: 100,
-    default: 50,
+    default: 0,
     fillFromMiddle: true,
     step: 1
   },
   {
     value: 'saturation',
-    min: 0,
+    min: -100,
     max: 100,
-    default: 50,
+    default: 0,
     fillFromMiddle: true,
     step: 1
   },
   {
     value: 'warmth',
-    min: 0,
+    min: -100,
     max: 100,
-    default: 50,
+    default: 0,
     fillFromMiddle: true,
     step: 1
   },
@@ -561,17 +583,17 @@ const effectsDefault: EffectDefault[] = [
   },
   {
     value: 'highlights',
-    min: 0,
+    min: -100,
     max: 100,
-    default: 50,
+    default: 0,
     fillFromMiddle: true,
     step: 1
   },
   {
     value: 'shadows',
-    min: 0,
+    min: -100,
     max: 100,
-    default: 50,
+    default: 0,
     fillFromMiddle: true,
     step: 1
   },
@@ -610,8 +632,12 @@ const getDefaultEffects = () => {
   }, {}) as MediaEditorEffects;
 }
 
-export const EffectsController = () => {
+export const EffectsController = ({onEffectsUpdated}: { onEffectsUpdated: (eff: MediaEditorEffects) => void }) => {
   const [effects, setEffects] = createSignal<MediaEditorEffects>(getDefaultEffects());
+
+  createEffect(() => {
+    onEffectsUpdated(effects());
+  })
 
   return (
     <SimpleScrollableYTsx class={'media-editor-container-toolbar-section media-editor-container-toolbar-effects'}>
@@ -630,7 +656,7 @@ export const EffectsController = () => {
             }}
             min={item.min}
             max={item.max}
-            step={0.01}
+            step={1}
             fillFromMiddle={item.fillFromMiddle}
           />
         )}
@@ -1770,7 +1796,7 @@ export const MediaEditor = ({
             <IconTsx icon={'smile'} class={'btn-icon'}/>
           ]}
           content={[
-            <EffectsController />,
+            <EffectsController onEffectsUpdated={e => editor.setEffects(e)} />,
             <ScreenAspectRatioController />,
             <TextController getRenderPicker={() => tab() === 2} />,
             <PaintController
