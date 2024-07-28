@@ -19,8 +19,17 @@ import {Document} from '../../layer';
 import SuperStickerRenderer from '../emoticonsDropdown/tabs/SuperStickerRenderer';
 import LazyLoadQueue from '../lazyLoadQueue';
 import {drawText} from './renderText';
-import {applyBrightnessContrast} from './effects/applyBrightnessContrast';
-import {applySaturation} from './effects/applySaturation';
+import {createContrastFilter} from './effects/createContrastFilter';
+import {createSaturationFilter} from './effects/createSaturationFilter';
+import {createWarmthFilter} from './effects/createWarmthFilter';
+import {applyFilters} from './effects/applyFilter';
+import {applySharpness} from './effects/applySharpness';
+import {createBrightnessFilter} from './effects/createBrightnessFilter';
+import {createShadowsHighlightsFilter} from './effects/createShadowsHighlightsFilter';
+import {applyVignette} from './effects/applyVignette';
+import {createGrainFilter} from './effects/createGrainFilter';
+import {createFadeFilter} from './effects/createFadeFilter';
+import {createEnhanceFilter} from './effects/createEnhanceFilter';
 
 
 class Editor {
@@ -84,8 +93,8 @@ class Editor {
       newWidth = editorElementWidth;
     }
 
-    this.workSpaceEditorElement.style.width = this.image.style.width = `${newWidth}px`;
-    this.workSpaceEditorElement.style.height = this.image.style.height = `${newHeight}px`;
+    this.workSpaceEditorElement.style.width = this.effectsCanvas.style.width = `${newWidth}px`;
+    this.workSpaceEditorElement.style.height = this.effectsCanvas.style.height = `${newHeight}px`;
 
     const {width: workSpaceEditorWidth, height: workSpaceEditorHeight} = this.workSpaceEditorElement.getBoundingClientRect();
     const top = editorElementHeight / 2 - workSpaceEditorHeight / 2;
@@ -208,8 +217,18 @@ class Editor {
     this.effectsCanvas.height = this.image.height;
     const ctx = this.effectsCanvas.getContext('2d');
     ctx.drawImage(this.image, 0, 0);
-    applyBrightnessContrast(ctx, this.effects.brightness, this.effects.contrast);
-    applySaturation(ctx, this.effects.saturation);
+    applyFilters(ctx, [
+      createEnhanceFilter(this.effects.enhance),
+      createContrastFilter(this.effects.contrast),
+      createBrightnessFilter(this.effects.brightness),
+      createWarmthFilter(this.effects.warmth),
+      createSaturationFilter(this.effects.saturation),
+      createShadowsHighlightsFilter(this.effects.shadows, this.effects.highlights),
+      createGrainFilter(this.effects.grain),
+      createFadeFilter(this.effects.fade)
+    ]);
+    applySharpness(ctx, this.effects.sharpen);
+    applyVignette(ctx, this.effects.vignette);
   }
 
   public setPaintingInfo({size, color}: PaintingInfo) {
