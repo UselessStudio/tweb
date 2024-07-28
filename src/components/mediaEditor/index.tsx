@@ -1653,12 +1653,18 @@ class TextsLayer {
       return;
     }
 
-    const index = this.textBlocks.findIndex(() => f)
+    const index = this.textBlocks.findIndex(({id}) => id === target.id)
 
     target.textBlock.style.textAlign = align;
     target.textBlock.style.color = color;
     target.textBlock.style.fontSize = `${size}px`;
     target.textBlock.style.fontFamily = font;
+
+    this.textBlocks[index].state.align = align;
+    this.textBlocks[index].state.color = color;
+    this.textBlocks[index].state.type = type;
+    this.textBlocks[index].state.size = size;
+    this.textBlocks[index].state.font = font;
   }
 
   public addTextBlock() {
