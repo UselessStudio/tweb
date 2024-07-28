@@ -1236,7 +1236,7 @@ export default class PopupNewMedia extends PopupElement {
     }
 
     console.log('почини это')
-    // this.listenerSetter.add(document.body)('keydown', this.onKeyDown);
+    this.listenerSetter.add(document.body)('keydown', this.onKeyDown);
     animationIntersector.setOnlyOnePlayableGroup(this.animationGroup);
     this.addEventListener('close', () => {
       animationIntersector.setOnlyOnePlayableGroup();

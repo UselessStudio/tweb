@@ -60,7 +60,6 @@ import {averageColorFromCanvas, averageColorFromImage} from '../../helpers/avera
 import highlightingColor from '../../helpers/highlightingColor';
 import callbackify from '../../helpers/callbackify';
 import useIsNightTheme from '../../hooks/useIsNightTheme';
-import {openMediaEditor} from '../mediaEditor';
 
 export enum ChatType {
   Chat = 'chat',
@@ -74,7 +73,6 @@ export enum ChatType {
 
 export type ChatSearchKeys = Pick<RequestHistoryOptions, 'query' | 'isCacheableSearch' | 'isPublicHashtag' | 'savedReaction' | 'fromPeerId' | 'inputFilter' | 'hashtagType'>;
 export const CHAT_SEARCH_KEYS: (keyof ChatSearchKeys)[] = ['query', 'isCacheableSearch', 'isPublicHashtag', 'savedReaction', 'fromPeerId', 'inputFilter', 'hashtagType'];
-openMediaEditor('/assets/img/screenshot.jpg');
 
 export default class Chat extends EventListenerBase<{
   setPeer: (mid: number, isTopMessage: boolean) => void
