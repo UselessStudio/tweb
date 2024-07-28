@@ -196,7 +196,6 @@ export default class PopupElement<T extends EventListenerListeners = {}> extends
 
     this.container.append(this.header);
     if(options.body) {
-      console.log(123);
       this.body = document.createElement('div');
       this.body.classList.add('popup-body');
       this.container.append(this.body);
