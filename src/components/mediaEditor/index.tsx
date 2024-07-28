@@ -217,6 +217,7 @@ class Editor {
     this.effectsCanvas.height = this.image.height;
     const ctx = this.effectsCanvas.getContext('2d');
     ctx.drawImage(this.image, 0, 0);
+    if(this.image.width === 0 || this.image.height === 0) return;
     applyFilters(ctx, [
       createEnhanceFilter(this.effects.enhance),
       createContrastFilter(this.effects.contrast),
@@ -1480,7 +1481,7 @@ export class Transformable {
       }, false);
     })
 
-    resize(this.initialMinWidth, this.initialMinHeight);
+    resize(this.initialWidth, this.initialHeight);
     repositionElement(this.initialLeft, this.initialTop);
   }
 }
@@ -1641,8 +1642,8 @@ class StickersLayer {
       attachTo: this.target,
       children: container,
       options: {
-        minHeight: 200,
-        minWidth: 200,
+        minHeight: 80,
+        minWidth: 80,
         width: 300,
         height: 300,
         left: this.target?.clientLeft + this.target?.clientWidth / 2,
